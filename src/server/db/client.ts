@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import * as schema from './schema';
 
 export type Database = NodePgDatabase<typeof schema>;
+export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 
 type DbConnection = { pool: Pool; db: Database };
 
