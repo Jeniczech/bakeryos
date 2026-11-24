@@ -5,7 +5,9 @@ import { closeDb, getDb } from '@/server/db/client';
 import {
     lockDailyPlans,
     materializeDailyPlans,
+    MissingDailyPlanError,
     sortProductIds,
+    type DailyPlan,
 } from '@/server/db/lock-daily-plans';
 import { dailyProductPlans, products } from '@/server/db/schema';
 
@@ -56,6 +58,11 @@ describe('sortProductIds', () => {
         const a = '0b6c7c55-0000-4000-8000-000000000000';
         const b = 'f1d2e3a4-0000-4000-8000-000000000000';
         expect(sortProductIds([b, a, b])).toEqual([a, b]);
+    });
+
+    it('lowercases IDs so case variants of one UUID collapse', () => {
+        const a = '0b6c7c55-0000-4000-8000-00000000abcd';
+        expect(sortProductIds([a.toUpperCase(), a])).toEqual([a]);
     });
 });
 
@@ -143,14 +150,26 @@ describe('lockDailyPlans', () => {
     it('materializes missing plans and returns them in ascending product-ID order', async () => {
         const bread = await insertProduct({ defaultCapacity: 20, defaultWalkInQuantity: 5 });
         const roll = await insertProduct({ defaultCapacity: 8, defaultWalkInQuantity: 0 });
-        const unknownId = randomUUID();
 
         const plans = await getDb().transaction((tx) =>
-            lockDailyPlans(tx, DATE, [roll.id, unknownId, bread.id, roll.id]),
+            lockDailyPlans(tx, DATE, [roll.id, bread.id.toUpperCase(), roll.id]),
         );
 
         expect(plans.map((plan) => plan.productId)).toEqual(sortProductIds([bread.id, roll.id]));
         expect(await readPlans([bread.id, roll.id])).toHaveLength(2);
+    });
+
+    it('rejects unknown product IDs and rolls back the materialized plans', async () => {
+        const bread = await insertProduct({ defaultCapacity: 20, defaultWalkInQuantity: 5 });
+        const unknownId = randomUUID();
+
+        const locking = getDb().transaction((tx) =>
+            lockDailyPlans(tx, DATE, [bread.id, unknownId]),
+        );
+
+        await expect(locking).rejects.toBeInstanceOf(MissingDailyPlanError);
+        await expect(locking).rejects.toMatchObject({ productIds: [unknownId] });
+        expect(await readPlans([bread.id])).toHaveLength(0);
     });
 
     it('returns no plans for an empty list', async () => {
@@ -181,10 +200,12 @@ describe('lockDailyPlans', () => {
                 );
         });
 
+        let waiter: Promise<DailyPlan[]> | undefined;
         try {
-            await holderLocked;
+            // Racing the holder surfaces its error instead of hanging if it fails before locking.
+            await Promise.race([holderLocked, holder]);
             let waiterDone = false;
-            const waiter = getDb()
+            waiter = getDb()
                 .transaction((tx) => lockDailyPlans(tx, DATE, [bread.id]))
                 .finally(() => (waiterDone = true));
 
@@ -198,6 +219,7 @@ describe('lockDailyPlans', () => {
         } finally {
             releaseHolder();
             await holder.catch(() => {});
+            await waiter?.catch(() => {});
         }
     });
 

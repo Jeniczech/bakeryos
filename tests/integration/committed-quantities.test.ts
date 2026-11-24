@@ -5,6 +5,7 @@ import { closeDb, getDb, type DbExecutor } from '@/server/db/client';
 import { getCommittedQuantities } from '@/server/db/committed-quantities';
 import { lockDailyPlans } from '@/server/db/lock-daily-plans';
 import { dailyProductPlans, products, reservationItems, reservations } from '@/server/db/schema';
+import type { CommittedQuantities } from '@/server/domain/availability';
 import type { ReservationStatus } from '@/server/domain/reservation-rules';
 
 // Far outside any booking window, so tests never collide with seeded or demo data.
@@ -133,6 +134,17 @@ describe('getCommittedQuantities', () => {
         expect(committed.get(roll.id)).toEqual({ activeReserved: 7, retainedCancelled: 0 });
     });
 
+    it('keys results by lowercase ID so uppercase input still sees committed items', async () => {
+        const bread = await insertProduct();
+        const db = getDb();
+        await insertReservation(db, { items: [{ productId: bread.id, quantity: 4 }] });
+
+        const committed = await getCommittedQuantities(db, DATE, [bread.id.toUpperCase()]);
+
+        expect([...committed.keys()]).toEqual([bread.id]);
+        expect(committed.get(bread.id)).toEqual({ activeReserved: 4, retainedCancelled: 0 });
+    });
+
     it('returns zeros for products without reservations and nothing for an empty list', async () => {
         const unknownId = randomUUID();
 
@@ -144,6 +156,8 @@ describe('getCommittedQuantities', () => {
 
     it('includes a competing reservation committed while waiting for the plan lock', async () => {
         const bread = await insertProduct();
+        // Commit the plan first so the waiter blocks on the row lock, not on the uncommitted insert.
+        await getDb().transaction((tx) => lockDailyPlans(tx, DATE, [bread.id]));
         let releaseHolder = () => {};
         const holderMayCommit = new Promise<void>((resolve) => (releaseHolder = resolve));
         let signalLocked = () => {};
@@ -156,14 +170,21 @@ describe('getCommittedQuantities', () => {
             await holderMayCommit;
         });
 
+        let waiter: Promise<Map<string, CommittedQuantities>> | undefined;
         try {
-            await holderLocked;
-            const waiter = getDb().transaction(async (tx) => {
-                await lockDailyPlans(tx, DATE, [bread.id]);
-                return getCommittedQuantities(tx, DATE, [bread.id]);
-            });
+            // Racing the holder surfaces its error instead of hanging if it fails before locking.
+            await Promise.race([holderLocked, holder]);
+            let waiterDone = false;
+            waiter = getDb()
+                .transaction(async (tx) => {
+                    await lockDailyPlans(tx, DATE, [bread.id]);
+                    return getCommittedQuantities(tx, DATE, [bread.id]);
+                })
+                .finally(() => (waiterDone = true));
 
-            await delay(100);
+            await delay(200);
+            expect(waiterDone).toBe(false);
+
             releaseHolder();
             await holder;
 
@@ -174,6 +195,7 @@ describe('getCommittedQuantities', () => {
         } finally {
             releaseHolder();
             await holder.catch(() => {});
+            await waiter?.catch(() => {});
         }
     });
 });
