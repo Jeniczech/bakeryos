@@ -109,14 +109,14 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 
 ### Tasks
 
-- [ ] Implement `GET /api/products?date=...`.
-- [ ] Implement `POST /api/reservations` with public source forced to `online`.
-- [ ] Add PostgreSQL-backed rate limiting to `POST /api/reservations` (`429` + `Retry-After`).
-- [ ] Implement `GET /api/reservations/manage/:token`.
-- [ ] Implement `POST /api/reservations/manage/:token/cancel`.
-- [ ] Add Zod schemas, typed domain errors, and RFC 9457 Problem Details responses.
-- [ ] Implement transactional `cancelReservation()` using shared daily-plan locks.
-- [ ] Verify no sensitive management tokens are logged or cached.
+- [x] Implement `GET /api/products?date=...`.
+- [x] Implement `POST /api/reservations` with public source forced to `online`.
+- [x] Add PostgreSQL-backed rate limiting to `POST /api/reservations` (`429` + `Retry-After`).
+- [x] Implement `GET /api/reservations/manage/:token`.
+- [x] Implement `POST /api/reservations/manage/:token/cancel`.
+- [x] Add Zod schemas, typed domain errors, and RFC 9457 Problem Details responses.
+- [x] Implement transactional `cancelReservation()` using shared daily-plan locks.
+- [x] Verify no sensitive management tokens are logged or cached.
 
 ### Acceptance criteria
 
