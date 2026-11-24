@@ -81,7 +81,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 
 ### Tasks
 
-- [ ] Implement first-write daily-plan materialization.
+- [x] Implement first-write daily-plan materialization.
 - [ ] Implement deterministic multi-product `SELECT ... FOR UPDATE` locking.
 - [ ] Implement committed-quantity aggregation after locks.
 - [ ] Implement `createReservation()` with trusted `online`/`admin` source.
