@@ -37,9 +37,9 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Add `/api/health` that checks DB connectivity.
 - [x] Deploy a minimal version to Netlify connected to Neon.
 - [x] Use Neon's **pooled** connection string for runtime connections; keep migrations on a separate (unpooled) connection if the migration tooling requires it.
-- [ ] Verify the chosen Drizzle driver supports **connection-bound interactive transactions** and `SELECT ... FOR UPDATE` **through the pooler** in the deployed runtime.
-- [ ] Run a minimal **concurrent** transaction test against Neon via the pooled connection, confirming that row-level locking prevents conflicting updates.
-- [ ] Verify **Argon2id** hash and verify inside a deployed Netlify Function, not only at build time. Keep Argon2id if compatible; propose an alternative before changing the hashing approach.
+- [x] Verify the chosen Drizzle driver supports **connection-bound interactive transactions** and `SELECT ... FOR UPDATE` **through the pooler** in the deployed runtime.
+- [x] Run a minimal **concurrent** transaction test against Neon via the pooled connection, confirming that row-level locking prevents conflicting updates.
+- [x] Verify **Argon2id** hash and verify inside a deployed Netlify Function, not only at build time. Keep Argon2id if compatible; propose an alternative before changing the hashing approach.
 
 ### Acceptance criteria
 
