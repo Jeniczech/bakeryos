@@ -1,5 +1,5 @@
 import { eq, inArray } from 'drizzle-orm';
-import type { Transaction } from '@/server/db/client';
+import type { DbExecutor } from '@/server/db/client';
 import { bakeryClosures, bakeryOpeningDays, productWeekdays, products } from '@/server/db/schema';
 import {
     PickupDateUnavailableError,
@@ -15,12 +15,12 @@ import {
 
 export type OfferedProduct = { id: string; name: string; price: number };
 
-const loadSchedule = async (tx: Transaction, date: string): Promise<BakerySchedule> => {
-    const openDays = await tx
+const loadSchedule = async (db: DbExecutor, date: string): Promise<BakerySchedule> => {
+    const openDays = await db
         .select({ weekday: bakeryOpeningDays.weekday })
         .from(bakeryOpeningDays)
         .where(eq(bakeryOpeningDays.isOpen, true));
-    const closures = await tx
+    const closures = await db
         .select({ date: bakeryClosures.date })
         .from(bakeryClosures)
         .where(eq(bakeryClosures.date, date));
@@ -32,12 +32,12 @@ const loadSchedule = async (tx: Transaction, date: string): Promise<BakerySchedu
 
 /** Rejects dates outside the source's booking window, after its cutoff, or on closed days. */
 export const assertPickupDateAvailable = async (
-    tx: Transaction,
+    db: DbExecutor,
     pickupDate: string,
     source: ReservationSource,
     now: Date,
 ): Promise<void> => {
-    const schedule = await loadSchedule(tx, pickupDate);
+    const schedule = await loadSchedule(db, pickupDate);
     const dateCheck = checkPickupDate({ pickupDate, source, now, schedule });
     if (!dateCheck.ok) {
         throw new PickupDateUnavailableError(dateCheck.reason);
@@ -46,11 +46,11 @@ export const assertPickupDateAvailable = async (
 
 /** Returns the products in the order of `productIds`, or rejects every unavailable one at once. */
 export const loadOfferedProducts = async (
-    tx: Transaction,
+    db: DbExecutor,
     productIds: readonly string[],
     pickupDate: string,
 ): Promise<OfferedProduct[]> => {
-    const rows = await tx
+    const rows = await db
         .select({
             id: products.id,
             name: products.name,
@@ -59,7 +59,7 @@ export const loadOfferedProducts = async (
         })
         .from(products)
         .where(inArray(products.id, [...productIds]));
-    const weekdayRows = await tx
+    const weekdayRows = await db
         .select({ productId: productWeekdays.productId, weekday: productWeekdays.weekday })
         .from(productWeekdays)
         .where(inArray(productWeekdays.productId, [...productIds]));
