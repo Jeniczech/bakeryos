@@ -52,6 +52,7 @@ The installed Next.js version may differ from your training data. Before writing
 ### During implementation
 
 - Work on one implementation stage at a time.
+- Do all work in feature branches (e.g. `stage-1/health-endpoint`), never directly on `main`. Merge to `main` only with approval.
 - Make small, focused changes.
 - Follow existing project conventions.
 - Prefer simple functions and explicit types.
