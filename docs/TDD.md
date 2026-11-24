@@ -213,6 +213,8 @@ Unique `(reservation_id, product_id)`.
 - `bakery_closures(date UNIQUE, reason NULLABLE)`.
 - `product_weekdays(product_id, weekday)` with unique `(product_id, weekday)`.
 
+Weekdays use `0 = Sunday … 6 = Saturday` (JavaScript `getUTCDay()`, PostgreSQL `DOW`). A product with **no** `product_weekdays` rows is offered on every open day; otherwise only on the listed weekdays. This keeps admin-created products bookable while the weekday editor is deferred.
+
 Seed these tables; schedule-management UI is deferred.
 
 ### 5.6.1 `rate_limits`
@@ -227,11 +229,13 @@ Fixed-window counter updated with a single atomic `INSERT ... ON CONFLICT (key, 
 
 ### 5.7 Indexes and constraints
 
-- Reservations: `pickup_date`, `(pickup_date, status)`.
-- Reservation items: `reservation_id`, `product_id`.
+- Reservations: `(pickup_date, status)`; it also serves `pickup_date`-only queries.
+- Reservation items: `product_id`; `reservation_id` lookups use the unique `(reservation_id, product_id)` index.
 - Daily plans: unique `(product_id, date)`.
 - Reservations: unique `reservation_number`, `management_token_hash`, `idempotency_key`.
 - CHECK constraints for status, source, nonnegative quantities/prices, and walk-in <= capacity.
+- Reservations: `cancelled_at` is set if and only if `status = 'cancelled'`; `retain_for_production` may be true only when `status = 'cancelled'`.
+- Products: `name` must not be blank.
 - Cross-table aggregate capacity invariants are enforced by transactions, not CHECK constraints.
 
 ## 6. Concurrency and transaction protocol
@@ -252,7 +256,7 @@ Avoid acquiring reservation row locks before daily-plan locks in one workflow an
 
 Trusted input includes idempotency key, pickup date, customer name/phone, product IDs/quantities, and server-assigned source.
 
-1. Zod-validate and normalize input (including phone normalization and online quantity limits); merge/reject duplicate product IDs and sort items deterministically.
+1. Zod-validate and normalize input (including phone normalization and online quantity limits); merge duplicate product IDs by summing quantities (online limits apply to the merged quantities) and sort items deterministically.
 2. Compute canonical request hash from normalized fields **including trusted source**.
 3. Begin transaction and check existing idempotency key.
 4. If found: compare hashes; return existing confirmation or reject conflicting reuse.
