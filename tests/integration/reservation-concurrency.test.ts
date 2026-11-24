@@ -18,6 +18,7 @@ import {
 import { getCommittedQuantity } from '@/server/domain/availability';
 import { InsufficientCapacityError, PlanBelowCommitmentsError } from '@/server/domain/errors';
 import { updateDailyPlan } from '@/server/services/production/update-daily-plan';
+import { cancelReservation } from '@/server/services/reservations/cancel-reservation';
 import {
     createReservation,
     type CreateReservationInput,
@@ -333,6 +334,53 @@ describe('reservation concurrent with capacity reduction', () => {
             shortages: [{ productId: bread.id, requested: 6, available: 5 }],
         });
         expect(await readPlan(bread.id)).toMatchObject({ capacity: 5 });
+        expect((await readCommitted([bread.id])).get(bread.id)).toBe(0);
+    });
+});
+
+describe('cancellation concurrent with a new reservation', () => {
+    const cancel = (reservationId: string) =>
+        cancelReservation({ actor: 'admin', reservationId }, { now: BEFORE_CUTOFF });
+
+    it('lets the reservation use capacity released by a cancellation that commits first', async () => {
+        const bread = await insertProduct(3);
+        const existing = await reserve([{ productId: bread.id, quantity: 3 }]);
+
+        const holder = await holdPlanLocks([bread.id]);
+        let cancellation: Promise<unknown> | undefined;
+        let reservation: Promise<CreateReservationResult> | undefined;
+        try {
+            cancellation = (await holder.queue(() => cancel(existing.reservationId), 1)).result;
+            reservation = (
+                await holder.queue(() => reserve([{ productId: bread.id, quantity: 3 }]), 2)
+            ).result;
+        } finally {
+            await holder.release();
+        }
+
+        await expect(cancellation).resolves.toMatchObject({ status: 'cancelled' });
+        await expect(reservation).resolves.toMatchObject({ status: 'confirmed' });
+        expect((await readCommitted([bread.id])).get(bread.id)).toBe(3);
+    });
+
+    it('rejects the reservation when it locks before the cancellation releases capacity', async () => {
+        const bread = await insertProduct(3);
+        const existing = await reserve([{ productId: bread.id, quantity: 3 }]);
+
+        const holder = await holdPlanLocks([bread.id]);
+        let reservation: Promise<CreateReservationResult> | undefined;
+        let cancellation: Promise<unknown> | undefined;
+        try {
+            reservation = (
+                await holder.queue(() => reserve([{ productId: bread.id, quantity: 3 }]), 1)
+            ).result;
+            cancellation = (await holder.queue(() => cancel(existing.reservationId), 2)).result;
+        } finally {
+            await holder.release();
+        }
+
+        await expect(reservation).rejects.toBeInstanceOf(InsufficientCapacityError);
+        await expect(cancellation).resolves.toMatchObject({ status: 'cancelled' });
         expect((await readCommitted([bread.id])).get(bread.id)).toBe(0);
     });
 });
