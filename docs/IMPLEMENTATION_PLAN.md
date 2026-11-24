@@ -84,10 +84,10 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Implement first-write daily-plan materialization.
 - [x] Implement deterministic multi-product `SELECT ... FOR UPDATE` locking.
 - [x] Implement committed-quantity aggregation after locks.
-- [ ] Implement `createReservation()` with trusted `online`/`admin` source.
-- [ ] Apply cutoff only to online source; never bypass capacity.
-- [ ] Implement idempotency key, canonical request hash, and unique-conflict replay handling.
-- [ ] Implement deterministic HMAC management token derivation and stored token hash.
+- [x] Implement `createReservation()` with trusted `online`/`admin` source.
+- [x] Apply cutoff only to online source; never bypass capacity.
+- [x] Implement idempotency key, canonical request hash, and unique-conflict replay handling.
+- [x] Implement deterministic HMAC management token derivation and stored token hash.
 - [ ] Implement `updateDailyPlan()` with the same locking protocol.
 - [ ] Add core PostgreSQL integration tests for concurrency and idempotency.
 

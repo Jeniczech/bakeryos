@@ -21,6 +21,8 @@ pnpm db:seed               # schedule, demo catalog, admin (set ADMIN_SEED_PASSW
 pnpm dev                   # http://localhost:3000
 ```
 
+Set `MANAGEMENT_TOKEN_SECRET` in `.env` (min. 32 characters, e.g. `openssl rand -base64 32`) before creating reservations or running integration tests: reservation management tokens are derived from it.
+
 The seed is safe to re-run: it upserts the opening days and administrator (resetting the admin password from `ADMIN_SEED_PASSWORD`, min. 12 characters), adds missing closures, and inserts the demo catalog only when the `products` table is empty.
 
 `GET /api/health` returns `{"status":"ok","database":"ok"}` when the database is reachable, `503` otherwise.
@@ -45,7 +47,7 @@ The seed is safe to re-run: it upserts the opening days and administrator (reset
 
 - The GitHub repository is linked to Netlify: pushing to `main` deploys production; pull requests get Deploy Previews.
 - **Deploy only through Git.** Do not run `netlify deploy` from a local machine: it bundles local `.env*` files into the function and the host's native binary of `@node-rs/argon2`, which fails on Netlify's Linux runtime.
-- Netlify environment variables: `DATABASE_URL` (Neon **pooled** connection string), `DATABASE_URL_UNPOOLED` (direct connection, used for migrations), `NODE_VERSION=24`.
+- Netlify environment variables: `DATABASE_URL` (Neon **pooled** connection string), `DATABASE_URL_UNPOOLED` (direct connection, used for migrations), `MANAGEMENT_TOKEN_SECRET` (min. 32 characters; keep it stable across deploys, because changing it invalidates every existing management link), `NODE_VERSION=24`.
 
 ### Migrations
 
