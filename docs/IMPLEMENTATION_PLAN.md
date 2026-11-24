@@ -58,14 +58,14 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 
 ### Tasks
 
-- [ ] Implement products, daily plans, reservations, reservation items, admin users, schedule, and `rate_limits` tables.
-- [ ] Add DB constraints, indexes, the `reservation_number_seq` sequence, and migrations.
-- [ ] Seed bakery schedule, sample products, and one administrator.
-- [ ] Implement pure availability and recommended-production functions.
-- [ ] Implement cutoff calculation in `Europe/Prague`.
-- [ ] Implement reservation state-transition and date/product eligibility rules, including online (`today+1..today+7`) and admin (`today..today+7`) booking windows.
-- [ ] Implement online quantity limits and phone normalization (Zod).
-- [ ] Add Vitest unit tests.
+- [x] Implement products, daily plans, reservations, reservation items, admin users, schedule, and `rate_limits` tables.
+- [x] Add DB constraints, indexes, the `reservation_number_seq` sequence, and migrations.
+- [x] Seed bakery schedule, sample products, and one administrator.
+- [x] Implement pure availability and recommended-production functions.
+- [x] Implement cutoff calculation in `Europe/Prague`.
+- [x] Implement reservation state-transition and date/product eligibility rules, including online (`today+1..today+7`) and admin (`today..today+7`) booking windows.
+- [x] Implement online quantity limits and phone normalization (Zod).
+- [x] Add Vitest unit tests.
 
 ### Acceptance criteria
 
