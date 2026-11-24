@@ -507,14 +507,13 @@ Flow: pickup date → eligible catalog → cart → name/phone → confirmation 
 - Show actionable errors for unavailable quantities and cutoff expiration.
 - Management link remains usable after page refresh.
 
-### 10.1 Storefront caching
+### 10.1 Storefront data loading
 
-Caching only speeds up what the storefront displays; it never affects reservation or capacity checks, which always read the database inside the transaction.
-
-- **Cached:** the products offered on a date (name, description, image, price), via `'use cache'` with `cacheLife('minutes')` and tag `catalog`. They do not depend on the current time. Date links use `prefetch`, so switching dates renders from cache.
-- **Never cached:** anything that depends on the current time or on reservations — the pickup-date list (booking window, cutoff), the selected date's bookability, and remaining availability. These render per request behind `<Suspense>` after `connection()`.
-- The pickup-date picker lives in a layout, which search-param navigation does not re-render, so the date list loads once per visit.
-- Admin mutations to products, product weekdays, opening days, or closures must invalidate the `catalog` tag. Until they do, displayed product details may be stale for minutes; prices shown at confirmation always come from the database.
+- The storefront page renders per request (`connection()`) and is never cached: the pickup dates depend on the current time and availability on reservations.
+- One read (`getOnlineCatalog`) loads the whole online booking window: every date with its bookability, and each bookable date's products with remaining availability. A client component switches dates locally and syncs `?date=` with `history.pushState`, so date changes never wait for the server. Refreshes, shared links, and the back button keep working.
+- Displayed availability is as of page load. It is informational; `createReservation` rechecks everything transactionally.
+- Dates and times are formatted on the server, so the browser's `Intl` data cannot cause hydration mismatches.
+- Not chosen: per-date server rendering with `'use cache'` and `<Link prefetch>`. Next 16 did not use the per-link prefetch for these navigations, so every date switch waited for a server round trip (~200 ms or more on Netlify).
 
 ## 11. Security and operational requirements
 
