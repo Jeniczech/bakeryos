@@ -34,7 +34,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Set up PostgreSQL, Drizzle, Drizzle Kit, and Docker Compose.
 - [x] Establish basic project folders from the TDD.
 - [x] Create `.env.example` and package scripts.
-- [ ] Add `/api/health` that checks DB connectivity.
+- [x] Add `/api/health` that checks DB connectivity.
 - [ ] Deploy a minimal version to Netlify connected to Neon.
 - [ ] Use Neon's **pooled** connection string for runtime connections; keep migrations on a separate (unpooled) connection if the migration tooling requires it.
 - [ ] Verify the chosen Drizzle driver supports **connection-bound interactive transactions** and `SELECT ... FOR UPDATE` **through the pooler** in the deployed runtime.
