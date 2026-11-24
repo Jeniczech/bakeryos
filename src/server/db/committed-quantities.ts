@@ -1,13 +1,15 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { summarizeCommitments, type CommittedQuantities } from '@/server/domain/availability';
 import type { DbExecutor } from './client';
+import { sortProductIds } from './lock-daily-plans';
 import { reservationItems, reservations } from './schema';
 
 /**
  * Sums reservation items per product for the pickup date, grouped by the fields that decide
  * whether an item is committed; the domain helper then applies that rule. Every requested
- * product gets an entry, zero when nothing is reserved. Inside a capacity-affecting write,
- * call this only after `lockDailyPlans()` so the totals include every committed competitor.
+ * product gets an entry keyed by its lowercase ID, zero when nothing is reserved. Inside a
+ * capacity-affecting write, call this only after `lockDailyPlans()` so the totals include
+ * every committed competitor.
  */
 export const getCommittedQuantities = async (
     db: DbExecutor,
@@ -15,7 +17,10 @@ export const getCommittedQuantities = async (
     productIds: readonly string[],
 ): Promise<Map<string, CommittedQuantities>> => {
     const committed = new Map<string, CommittedQuantities>(
-        productIds.map((productId) => [productId, { activeReserved: 0, retainedCancelled: 0 }]),
+        sortProductIds(productIds).map((productId) => [
+            productId,
+            { activeReserved: 0, retainedCancelled: 0 },
+        ]),
     );
     if (committed.size === 0) {
         return committed;

@@ -4,9 +4,20 @@ import { dailyProductPlans, products } from './schema';
 
 export type DailyPlan = typeof dailyProductPlans.$inferSelect;
 
-/** Deduplicated and sorted ascending; lowercase UUID strings sort like PostgreSQL `uuid` values. */
+/**
+ * Lowercased, deduplicated, and sorted ascending. PostgreSQL returns lowercase UUIDs, and
+ * lowercase UUID strings sort like `uuid` values, so results can be matched to requests by ID.
+ */
 export const sortProductIds = (productIds: readonly string[]): string[] =>
-    [...new Set(productIds)].sort();
+    [...new Set(productIds.map((productId) => productId.toLowerCase()))].sort();
+
+/** A requested product has no plan, i.e. it does not exist; callers must validate products first. */
+export class MissingDailyPlanError extends Error {
+    constructor(readonly productIds: readonly string[]) {
+        super(`No daily plan for product(s): ${productIds.join(', ')}`);
+        this.name = 'MissingDailyPlanError';
+    }
+}
 
 /**
  * First-write snapshot: creates any missing plans for the date from the products' current
@@ -37,7 +48,8 @@ export const materializeDailyPlans = async (
  * The shared locking protocol for every write that affects a product/date's capacity or
  * committed quantity: materialize missing plans, then lock them with `FOR UPDATE` in
  * ascending product-ID order (PostgreSQL locks rows as the sorted rows are returned).
- * Returns the locked plans in that order; unknown product IDs have no plan and are omitted.
+ * Returns exactly one locked plan per distinct requested product, in that order, and throws
+ * `MissingDailyPlanError` if any product is unknown, which rolls back the caller's transaction.
  * Committed quantities must be read only after this returns.
  */
 export const lockDailyPlans = async (
@@ -50,10 +62,15 @@ export const lockDailyPlans = async (
         return [];
     }
     await materializeDailyPlans(tx, date, ids);
-    return tx
+    const plans = await tx
         .select()
         .from(dailyProductPlans)
         .where(and(eq(dailyProductPlans.date, date), inArray(dailyProductPlans.productId, ids)))
         .orderBy(asc(dailyProductPlans.productId))
         .for('update');
+    if (plans.length !== ids.length) {
+        const lockedIds = new Set(plans.map((plan) => plan.productId));
+        throw new MissingDailyPlanError(ids.filter((productId) => !lockedIds.has(productId)));
+    }
+    return plans;
 };
