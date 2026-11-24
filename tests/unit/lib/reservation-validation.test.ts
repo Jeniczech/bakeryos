@@ -11,6 +11,7 @@ import {
 const productA = '11111111-1111-4111-8111-111111111111';
 const productB = '22222222-2222-4222-8222-222222222222';
 const productC = '33333333-3333-4333-8333-333333333333';
+const productHex = 'abcdef12-3456-4789-8abc-def123456789';
 
 const validRequest = {
     idempotencyKey: 'd6c7c4a8-61e2-4a41-89c7-4d3f61b3a825',
@@ -123,6 +124,30 @@ describe('reservationRequestSchema', () => {
         ]);
     });
 
+    it('lowercases UUIDs so differently cased duplicates merge', () => {
+        const parsed = reservationRequestSchema.parse({
+            ...validRequest,
+            idempotencyKey: validRequest.idempotencyKey.toUpperCase(),
+            items: [
+                { productId: productHex.toUpperCase(), quantity: 2 },
+                { productId: productHex, quantity: 3 },
+            ],
+        });
+        expect(parsed.idempotencyKey).toBe(validRequest.idempotencyKey);
+        expect(parsed.items).toEqual([{ productId: productHex, quantity: 5 }]);
+    });
+
+    it('accepts up to 100 items and rejects more', () => {
+        const items = (count: number) =>
+            Array.from({ length: count }, () => ({ productId: productA, quantity: 1 }));
+        expect(
+            reservationRequestSchema.safeParse({ ...validRequest, items: items(100) }).success,
+        ).toBe(true);
+        expect(
+            reservationRequestSchema.safeParse({ ...validRequest, items: items(101) }).success,
+        ).toBe(false);
+    });
+
     it('does not apply online limits', () => {
         const result = reservationRequestSchema.safeParse({
             ...validRequest,
@@ -156,6 +181,17 @@ describe('onlineReservationRequestSchema', () => {
             items: [
                 { productId: productA, quantity: 15 },
                 { productId: productA, quantity: 6 },
+            ],
+        });
+        expect(result.success).toBe(false);
+    });
+
+    it('applies the per-product limit across differently cased product IDs', () => {
+        const result = onlineReservationRequestSchema.safeParse({
+            ...validRequest,
+            items: [
+                { productId: productHex, quantity: 20 },
+                { productId: productHex.toUpperCase(), quantity: 20 },
             ],
         });
         expect(result.success).toBe(false);
