@@ -1,19 +1,13 @@
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { getDb } from '@/server/db/client';
 import { getCommittedQuantities } from '@/server/db/committed-quantities';
-import { dailyProductPlans, productWeekdays, products } from '@/server/db/schema';
+import { dailyProductPlans } from '@/server/db/schema';
 import { getRemainingAvailability } from '@/server/domain/availability';
-import { checkProductOffered, getOnlineCutoff } from '@/server/domain/reservation-rules';
-import { assertPickupDateAvailable, groupWeekdaysByProduct } from '../eligibility';
+import { getOnlineCutoff } from '@/server/domain/reservation-rules';
+import { assertPickupDateAvailable } from '../eligibility';
+import { listOfferedProducts, type CatalogProduct } from './get-offered-products';
 
-export type AvailableProduct = {
-    id: string;
-    name: string;
-    description: string | null;
-    imageUrl: string | null;
-    price: number; // haléře
-    remainingQuantity: number;
-};
+export type AvailableProduct = CatalogProduct & { remainingQuantity: number };
 
 export type ProductCatalog = {
     pickupDate: string;
@@ -34,61 +28,36 @@ export const getAvailableProducts = async (
     const db = getDb();
     await assertPickupDateAvailable(db, pickupDate, 'online', options.now ?? new Date());
 
-    const rows = await db
-        .select({
-            id: products.id,
-            name: products.name,
-            description: products.description,
-            imageUrl: products.imageUrl,
-            price: products.price,
-            capacity: dailyProductPlans.capacity,
-            walkInQuantity: dailyProductPlans.walkInQuantity,
-            defaultCapacity: products.defaultCapacity,
-            defaultWalkInQuantity: products.defaultWalkInQuantity,
-        })
-        .from(products)
-        .leftJoin(
-            dailyProductPlans,
-            and(
-                eq(dailyProductPlans.productId, products.id),
-                eq(dailyProductPlans.date, pickupDate),
-            ),
-        )
-        .where(eq(products.active, true))
-        .orderBy(asc(products.name), asc(products.id));
-    const ids = rows.map((row) => row.id);
-    const weekdayRows =
+    const offered = await listOfferedProducts(db, pickupDate);
+    const ids = offered.map((row) => row.id);
+    const plans =
         ids.length > 0
             ? await db
                   .select({
-                      productId: productWeekdays.productId,
-                      weekday: productWeekdays.weekday,
+                      productId: dailyProductPlans.productId,
+                      capacity: dailyProductPlans.capacity,
+                      walkInQuantity: dailyProductPlans.walkInQuantity,
                   })
-                  .from(productWeekdays)
-                  .where(inArray(productWeekdays.productId, ids))
+                  .from(dailyProductPlans)
+                  .where(
+                      and(
+                          eq(dailyProductPlans.date, pickupDate),
+                          inArray(dailyProductPlans.productId, ids),
+                      ),
+                  )
             : [];
-    const weekdaysByProduct = groupWeekdaysByProduct(weekdayRows);
-    const offered = rows.filter(
-        (row) =>
-            checkProductOffered(
-                { active: true, weekdays: weekdaysByProduct.get(row.id) ?? [] },
-                pickupDate,
-            ).ok,
-    );
-    const committed = await getCommittedQuantities(
-        db,
-        pickupDate,
-        offered.map((row) => row.id),
-    );
+    const plansByProduct = new Map(plans.map((plan) => [plan.productId, plan]));
+    const committed = await getCommittedQuantities(db, pickupDate, ids);
 
     return {
         pickupDate,
         orderingCutoff: getOnlineCutoff(pickupDate),
         products: offered.map((row) => {
+            const plan = plansByProduct.get(row.id);
             const quantities = committed.get(row.id) ?? { activeReserved: 0, retainedCancelled: 0 };
             const remaining = getRemainingAvailability({
-                capacity: row.capacity ?? row.defaultCapacity,
-                walkInQuantity: row.walkInQuantity ?? row.defaultWalkInQuantity,
+                capacity: plan?.capacity ?? row.defaultCapacity,
+                walkInQuantity: plan?.walkInQuantity ?? row.defaultWalkInQuantity,
                 ...quantities,
             });
             return {

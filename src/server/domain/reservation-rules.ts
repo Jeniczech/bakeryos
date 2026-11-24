@@ -66,6 +66,27 @@ export const checkPickupDate = (input: {
     return { ok: true };
 };
 
+export type PickupDateOption = {
+    date: CalendarDate;
+    unavailableReason: PickupDateRejectionReason | null;
+};
+
+/** Every date in the source's booking window, each checked with `checkPickupDate`. */
+export const listPickupDates = (input: {
+    source: ReservationSource;
+    now: Date;
+    schedule: BakerySchedule;
+}): PickupDateOption[] => {
+    const { source, now, schedule } = input;
+    const { firstDate, lastDate } = getBookingWindow(source, getPragueDate(now));
+    const options: PickupDateOption[] = [];
+    for (let date = firstDate; date <= lastDate; date = addDays(date, 1)) {
+        const check = checkPickupDate({ pickupDate: date, source, now, schedule });
+        options.push({ date, unavailableReason: check.ok ? null : check.reason });
+    }
+    return options;
+};
+
 export type ProductRejectionReason = 'PRODUCT_INACTIVE' | 'PRODUCT_NOT_OFFERED_ON_DATE';
 
 /** An empty weekday list means the product is offered on every open day. */
