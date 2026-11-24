@@ -78,3 +78,32 @@ export class IdempotencyConflictError extends DomainError {
         super('This idempotency key was already used for a different request.');
     }
 }
+
+export class InvalidDailyPlanUpdateError extends DomainError {
+    readonly code = 'INVALID_REQUEST';
+
+    constructor(readonly issues: readonly ValidationIssue[]) {
+        super('The daily plan update is invalid.');
+    }
+}
+
+export class ProductNotFoundError extends DomainError {
+    readonly code = 'PRODUCT_NOT_FOUND';
+
+    constructor(readonly productId: string) {
+        super('The product does not exist.');
+    }
+}
+
+export class PlanBelowCommitmentsError extends DomainError {
+    readonly code = 'PLAN_BELOW_COMMITMENTS';
+
+    constructor(
+        readonly productId: string,
+        readonly committedQuantity: number,
+    ) {
+        super(
+            `Capacity must cover the walk-in quantity plus ${committedQuantity} already committed units.`,
+        );
+    }
+}

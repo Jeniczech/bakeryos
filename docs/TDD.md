@@ -316,7 +316,9 @@ Authenticated admin only. Materialize and lock the plan; aggregate committed qua
 newCapacity < newWalkInQuantity + committedQuantity
 ```
 
-Then update the plan and commit. Admin may do this after cutoff, but cannot violate commitments.
+Then update the plan and commit. Admin may do this after cutoff and for today, but cannot violate commitments. Plans for past dates (before today in `Europe/Prague`) cannot be changed, because they are production history.
+
+Returns the updated `DailyProductionItem`. Rejections use typed domain errors: `INVALID_REQUEST` (Zod validation, walk-in above capacity, or a past date), `PRODUCT_NOT_FOUND`, and `PLAN_BELOW_COMMITMENTS` (with the committed quantity).
 
 ## 7. Application services and project layout
 
