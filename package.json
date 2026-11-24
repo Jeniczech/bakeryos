@@ -17,10 +17,11 @@
         "db:down": "docker compose down",
         "db:generate": "drizzle-kit generate",
         "db:migrate": "drizzle-kit migrate",
-        "db:migrate:prod": "node --env-file=.env.production.local node_modules/drizzle-kit/bin.cjs migrate",
+        "db:migrate:prod": "node --env-file=.env.neon node_modules/drizzle-kit/bin.cjs migrate",
         "db:studio": "drizzle-kit studio"
     },
     "dependencies": {
+        "@node-rs/argon2": "2.2.2",
         "drizzle-orm": "0.45.4",
         "next": "16.4.6",
         "pg": "8.23.1",
