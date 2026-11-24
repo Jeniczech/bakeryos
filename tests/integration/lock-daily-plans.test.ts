@@ -6,7 +6,7 @@ import {
     lockDailyPlans,
     materializeDailyPlans,
     MissingDailyPlanError,
-    sortProductIds,
+    normalizeProductIds,
     type DailyPlan,
 } from '@/server/db/lock-daily-plans';
 import { dailyProductPlans, products } from '@/server/db/schema';
@@ -53,16 +53,16 @@ afterAll(async () => {
     await closeDb();
 });
 
-describe('sortProductIds', () => {
-    it('deduplicates and sorts ascending', () => {
+describe('normalizeProductIds', () => {
+    it('deduplicates', () => {
         const a = '0b6c7c55-0000-4000-8000-000000000000';
         const b = 'f1d2e3a4-0000-4000-8000-000000000000';
-        expect(sortProductIds([b, a, b])).toEqual([a, b]);
+        expect(normalizeProductIds([b, a, b])).toEqual([b, a]);
     });
 
     it('lowercases IDs so case variants of one UUID collapse', () => {
         const a = '0b6c7c55-0000-4000-8000-00000000abcd';
-        expect(sortProductIds([a.toUpperCase(), a])).toEqual([a]);
+        expect(normalizeProductIds([a.toUpperCase(), a])).toEqual([a]);
     });
 });
 
@@ -155,7 +155,7 @@ describe('lockDailyPlans', () => {
             lockDailyPlans(tx, DATE, [roll.id, bread.id.toUpperCase(), roll.id]),
         );
 
-        expect(plans.map((plan) => plan.productId)).toEqual(sortProductIds([bread.id, roll.id]));
+        expect(plans.map((plan) => plan.productId)).toEqual([bread.id, roll.id].sort());
         expect(await readPlans([bread.id, roll.id])).toHaveLength(2);
     });
 
@@ -169,6 +169,18 @@ describe('lockDailyPlans', () => {
 
         await expect(locking).rejects.toBeInstanceOf(MissingDailyPlanError);
         await expect(locking).rejects.toMatchObject({ productIds: [unknownId] });
+        expect(await readPlans([bread.id])).toHaveLength(0);
+    });
+
+    it('leaves no plan behind when the caller rejects after locking', async () => {
+        const bread = await insertProduct({ defaultCapacity: 20, defaultWalkInQuantity: 5 });
+
+        const rejected = getDb().transaction(async (tx) => {
+            await lockDailyPlans(tx, DATE, [bread.id]);
+            throw new Error('Product is not offered on this date');
+        });
+
+        await expect(rejected).rejects.toThrow('Product is not offered on this date');
         expect(await readPlans([bread.id])).toHaveLength(0);
     });
 
