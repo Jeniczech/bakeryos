@@ -1,0 +1,8 @@
+# Specification and agent instructions are edited by hand
+docs/
+CLAUDE.md
+
+pnpm-lock.yaml
+.next/
+next-env.d.ts
+drizzle/

@@ -37,6 +37,8 @@ Do not modify these documents without explicit approval.
 
 Do not introduce additional frameworks, services, or major dependencies without explaining the need and obtaining approval.
 
+The installed Next.js version may differ from your training data. Before writing Next.js code, consult the version-matched docs in `node_modules/next/dist/docs/` and heed deprecation notices.
+
 ## Working process
 
 ### Before implementation
