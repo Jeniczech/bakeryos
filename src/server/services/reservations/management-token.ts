@@ -29,3 +29,9 @@ export const deriveManagementToken = (
 /** Only this hash is stored, in `reservations.management_token_hash`. */
 export const hashManagementToken = (token: string): string =>
     createHash('sha256').update(token).digest('hex');
+
+// A base64url-encoded SHA-256 HMAC is always 43 characters.
+const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+/** Lets callers reject malformed tokens without a database lookup. */
+export const isWellFormedManagementToken = (token: string): boolean => TOKEN_PATTERN.test(token);

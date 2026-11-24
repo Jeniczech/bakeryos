@@ -1,5 +1,9 @@
 import type { ZodError } from 'zod';
-import type { PickupDateRejectionReason, ProductRejectionReason } from './reservation-rules';
+import type {
+    PickupDateRejectionReason,
+    ProductRejectionReason,
+    StatusTransitionRejectionReason,
+} from './reservation-rules';
 
 /** Expected business rejections; transports map `code` to a response (e.g. Problem Details). */
 export abstract class DomainError extends Error {
@@ -104,5 +108,27 @@ export class PlanBelowCommitmentsError extends DomainError {
         super(
             `Capacity must cover the walk-in quantity plus ${committedQuantity} already committed units.`,
         );
+    }
+}
+
+/** Also used for malformed or unknown management tokens, so a response never reveals which. */
+export class ReservationNotFoundError extends DomainError {
+    readonly code = 'RESERVATION_NOT_FOUND';
+
+    constructor() {
+        super('The reservation was not found.');
+    }
+}
+
+const STATUS_TRANSITION_MESSAGES: Record<StatusTransitionRejectionReason, string> = {
+    INVALID_TRANSITION: 'The reservation can no longer be changed.',
+    FORBIDDEN: 'This change is not allowed.',
+    CUTOFF_PASSED: 'Reservations can only be cancelled online until 18:00 the day before pickup.',
+    BEFORE_PICKUP_DATE: 'This status can only be set on or after the pickup date.',
+};
+
+export class StatusTransitionError extends DomainError {
+    constructor(readonly code: StatusTransitionRejectionReason) {
+        super(STATUS_TRANSITION_MESSAGES[code]);
     }
 }
