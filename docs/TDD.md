@@ -390,9 +390,12 @@ type CreateReservationResult = {
   reservationId: string;
   reservationNumber: string;
   pickupDate: string;
-  status: 'confirmed';
+  // 'confirmed' for a new reservation; an idempotent replay reports the current status.
+  status: 'confirmed' | 'picked_up' | 'cancelled' | 'no_show';
   totalPrice: number; // haléře
+  items: Array<{ productId: string; productName: string; unitPrice: number; quantity: number }>;
   managementToken: string;
+  replayed: boolean; // true for an idempotent replay (route returns 200 instead of 201)
 };
 
 type UpdateDailyPlanInput = {
