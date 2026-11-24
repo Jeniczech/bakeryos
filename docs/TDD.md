@@ -501,11 +501,20 @@ The manual reservation form may accept today's pickup date even after online cut
 
 Flow: pickup date → eligible catalog → cart → name/phone → confirmation → optional management/cancellation.
 
-- English UI, warm bakery styling, responsive and accessible.
+- Czech UI (`cs-CZ` date formatting), warm bakery styling, responsive and accessible. API Problem Details stay in English; the UI maps error `code`s to Czech copy.
 - Revalidate cart on date changes without silently modifying it.
 - Disable submission while pending; preserve idempotency key when retrying an unchanged payload, generate a new key when intentionally changing payload.
 - Show actionable errors for unavailable quantities and cutoff expiration.
 - Management link remains usable after page refresh.
+
+### 10.1 Storefront caching
+
+Caching only speeds up what the storefront displays; it never affects reservation or capacity checks, which always read the database inside the transaction.
+
+- **Cached:** the products offered on a date (name, description, image, price), via `'use cache'` with `cacheLife('minutes')` and tag `catalog`. They do not depend on the current time. Date links use `prefetch`, so switching dates renders from cache.
+- **Never cached:** anything that depends on the current time or on reservations — the pickup-date list (booking window, cutoff), the selected date's bookability, and remaining availability. These render per request behind `<Suspense>` after `connection()`.
+- The pickup-date picker lives in a layout, which search-param navigation does not re-render, so the date list loads once per visit.
+- Admin mutations to products, product weekdays, opening days, or closures must invalidate the `catalog` tag. Until they do, displayed product details may be stale for minutes; prices shown at confirmation always come from the database.
 
 ## 11. Security and operational requirements
 

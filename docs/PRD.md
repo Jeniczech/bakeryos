@@ -165,7 +165,7 @@ The system must never accept a reservation or daily-plan edit that results in ne
 3. Product management.
 4. Daily production overview and date-specific capacity edits.
 
-The interface should be mobile-friendly, accessible, simple, and visually warm, with English UI copy.
+The interface should be mobile-friendly, accessible, simple, and visually warm, with Czech UI copy. API error messages remain in English.
 
 ## 8. Scope prioritization
 

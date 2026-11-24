@@ -1,6 +1,6 @@
-import { eq, inArray } from 'drizzle-orm';
-import { isValidCalendarDate } from '@/lib/date-time/prague';
-import type { DbExecutor } from '@/server/db/client';
+import { and, eq, gte, inArray, lte } from 'drizzle-orm';
+import { getPragueDate, isValidCalendarDate } from '@/lib/date-time/prague';
+import { getDb, type DbExecutor } from '@/server/db/client';
 import { bakeryClosures, bakeryOpeningDays, productWeekdays, products } from '@/server/db/schema';
 import {
     PickupDateUnavailableError,
@@ -10,13 +10,22 @@ import {
 import {
     checkPickupDate,
     checkProductOffered,
+    getBookingWindow,
+    isBakeryOpen,
+    listPickupDates,
     type BakerySchedule,
+    type PickupDateOption,
     type ReservationSource,
 } from '@/server/domain/reservation-rules';
 
 export type OfferedProduct = { id: string; name: string; price: number };
 
-const loadSchedule = async (db: DbExecutor, date: string): Promise<BakerySchedule> => {
+/** Opening days, and the closures between `firstDate` and `lastDate` inclusive. */
+const loadSchedule = async (
+    db: DbExecutor,
+    firstDate: string,
+    lastDate: string = firstDate,
+): Promise<BakerySchedule> => {
     const openDays = await db
         .select({ weekday: bakeryOpeningDays.weekday })
         .from(bakeryOpeningDays)
@@ -24,7 +33,7 @@ const loadSchedule = async (db: DbExecutor, date: string): Promise<BakerySchedul
     const closures = await db
         .select({ date: bakeryClosures.date })
         .from(bakeryClosures)
-        .where(eq(bakeryClosures.date, date));
+        .where(and(gte(bakeryClosures.date, firstDate), lte(bakeryClosures.date, lastDate)));
     return {
         openWeekdays: new Set(openDays.map((day) => day.weekday)),
         closures: new Set(closures.map((closure) => closure.date)),
@@ -59,6 +68,21 @@ export const assertPickupDateAvailable = async (
     if (!dateCheck.ok) {
         throw new PickupDateUnavailableError(dateCheck.reason);
     }
+};
+
+/** Opening days and closures only; the booking window and cutoff depend on the current time. */
+export const isBakeryOpenOn = async (db: DbExecutor, date: string): Promise<boolean> =>
+    isBakeryOpen(date, await loadSchedule(db, date));
+
+/** The source's booking window, with the reason each unavailable date cannot be booked. */
+export const getPickupDates = async (
+    source: ReservationSource,
+    now: Date = new Date(),
+): Promise<PickupDateOption[]> => {
+    const db = getDb();
+    const { firstDate, lastDate } = getBookingWindow(source, getPragueDate(now));
+    const schedule = await loadSchedule(db, firstDate, lastDate);
+    return listPickupDates({ source, now, schedule });
 };
 
 /** Returns the products in the order of `productIds`, or rejects every unavailable one at once. */

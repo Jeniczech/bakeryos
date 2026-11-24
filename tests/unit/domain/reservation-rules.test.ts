@@ -7,6 +7,7 @@ import {
     getOnlineCutoff,
     isBakeryOpen,
     isBeforeOnlineCutoff,
+    listPickupDates,
     type BakerySchedule,
     type ReservationStatus,
 } from '@/server/domain/reservation-rules';
@@ -189,6 +190,37 @@ describe('checkPickupDate', () => {
             expect(check('2026-11-30', 'admin')).toEqual({ ok: false, reason: 'BAKERY_CLOSED' });
             expect(check('2026-11-28', 'admin')).toEqual({ ok: false, reason: 'BAKERY_CLOSED' });
         });
+    });
+});
+
+describe('listPickupDates', () => {
+    const list = (source: 'online' | 'admin', now = tuesdayMorning) =>
+        listPickupDates({ source, now, schedule: closedOnMondays });
+
+    it('lists tomorrow through today+7 online, flagging closed days', () => {
+        expect(list('online')).toEqual([
+            { date: '2026-11-25', unavailableReason: null },
+            { date: '2026-11-26', unavailableReason: null },
+            { date: '2026-11-27', unavailableReason: null },
+            { date: '2026-11-28', unavailableReason: 'BAKERY_CLOSED' },
+            { date: '2026-11-29', unavailableReason: null },
+            { date: '2026-11-30', unavailableReason: 'BAKERY_CLOSED' },
+            { date: '2026-12-01', unavailableReason: null },
+        ]);
+    });
+
+    it('flags tomorrow once the online cutoff has passed', () => {
+        expect(list('online', wednesdayCutoff)[0]).toEqual({
+            date: '2026-11-25',
+            unavailableReason: 'CUTOFF_PASSED',
+        });
+    });
+
+    it('starts at today for admin, ignoring the cutoff', () => {
+        const dates = list('admin', wednesdayCutoff);
+        expect(dates).toHaveLength(8);
+        expect(dates[0]).toEqual({ date: '2026-11-24', unavailableReason: null });
+        expect(dates[1]).toEqual({ date: '2026-11-25', unavailableReason: null });
     });
 });
 

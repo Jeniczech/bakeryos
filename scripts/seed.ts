@@ -30,10 +30,10 @@ const OPENING_DAYS = [
 ];
 
 const CLOSURES = [
-    { date: '2026-12-24', reason: 'Christmas Eve' },
-    { date: '2026-12-25', reason: 'Christmas Day' },
-    { date: '2026-12-26', reason: "St. Stephen's Day" },
-    { date: '2027-01-01', reason: "New Year's Day" },
+    { date: '2026-12-24', reason: 'Štědrý den' },
+    { date: '2026-12-25', reason: '1. svátek vánoční' },
+    { date: '2026-12-26', reason: '2. svátek vánoční' },
+    { date: '2027-01-01', reason: 'Nový rok' },
 ];
 
 type SeedProduct = typeof products.$inferInsert & { weekdays: number[] };
@@ -41,56 +41,56 @@ type SeedProduct = typeof products.$inferInsert & { weekdays: number[] };
 // Prices in haléře. An empty weekday list means the product is offered on every open day.
 const PRODUCTS: SeedProduct[] = [
     {
-        name: 'Sourdough country loaf',
-        description: 'Naturally leavened wheat and rye loaf with a crackling crust. 900 g.',
+        name: 'Kváskový chléb',
+        description: 'Pšenično-žitný chléb na kvásku s křupavou kůrkou. 900 g.',
         price: 8900,
         defaultCapacity: 30,
         defaultWalkInQuantity: 10,
         weekdays: [],
     },
     {
-        name: 'Rye bread with caraway',
-        description: 'Traditional Czech rye bread with caraway seeds. 1 kg.',
+        name: 'Žitný chléb s kmínem',
+        description: 'Tradiční český žitný chléb s kmínem. 1 kg.',
         price: 6500,
         defaultCapacity: 25,
         defaultWalkInQuantity: 8,
         weekdays: [],
     },
     {
-        name: 'Baguette',
-        description: 'Long-fermented French baguette.',
+        name: 'Bageta',
+        description: 'Dlouze kynutá francouzská bageta.',
         price: 4200,
         defaultCapacity: 50,
         defaultWalkInQuantity: 20,
         weekdays: [],
     },
     {
-        name: 'Butter croissant',
-        description: 'Laminated with French butter, baked every morning.',
+        name: 'Máslový croissant',
+        description: 'Z listového těsta s francouzským máslem, pečený každé ráno.',
         price: 3900,
         defaultCapacity: 60,
         defaultWalkInQuantity: 25,
         weekdays: [],
     },
     {
-        name: 'Cinnamon roll',
-        description: 'Soft brioche swirl with cinnamon and brown sugar.',
+        name: 'Skořicový šnek',
+        description: 'Nadýchaný briošový šnek se skořicí a třtinovým cukrem.',
         price: 4500,
         defaultCapacity: 40,
         defaultWalkInQuantity: 15,
         weekdays: [],
     },
     {
-        name: 'Poppy seed kolach',
-        description: 'Round Czech pastry filled with sweet poppy seeds. Weekends only.',
+        name: 'Makový koláč',
+        description: 'Kulatý koláč plněný sladkým mákem. Jen o víkendu.',
         price: 3500,
         defaultCapacity: 40,
         defaultWalkInQuantity: 15,
         weekdays: [6, 0],
     },
     {
-        name: 'Braided vánočka',
-        description: 'Festive braided sweet bread with raisins and almonds. Fridays and Saturdays.',
+        name: 'Vánočka',
+        description: 'Sváteční pletená vánočka s rozinkami a mandlemi. V pátek a v sobotu.',
         price: 18900,
         defaultCapacity: 12,
         defaultWalkInQuantity: 2,

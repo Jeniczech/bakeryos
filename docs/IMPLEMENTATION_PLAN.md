@@ -134,7 +134,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 
 ### Tasks
 
-- [ ] Build pickup-date selection and eligible catalog.
+- [x] Build pickup-date selection and eligible catalog.
 - [ ] Display price and remaining availability.
 - [ ] Build cart with integer quantities and totals.
 - [ ] Build customer name/phone form.
