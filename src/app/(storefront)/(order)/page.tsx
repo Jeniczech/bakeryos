@@ -9,8 +9,12 @@ const SelectedDate = ({ date }: { date: string | undefined }) => {
     }
     return (
         <div className="flex flex-col gap-4">
-            {/* Uncached and time-dependent; streams in after the cached catalog. */}
-            <Suspense fallback={null}>
+            {/*
+              Uncached and time-dependent; streams in after the cached catalog. Keyed by date:
+              navigations are transitions, and React keeps an already-visible boundary on screen
+              until its new content resolves, which would hold back the prefetched catalog.
+            */}
+            <Suspense key={date} fallback={null}>
                 <PickupDateStatus pickupDate={date} />
             </Suspense>
             <ProductCatalog pickupDate={date} />
