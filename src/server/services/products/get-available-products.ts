@@ -1,12 +1,10 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import { isValidCalendarDate } from '@/lib/date-time/prague';
 import { getDb } from '@/server/db/client';
 import { getCommittedQuantities } from '@/server/db/committed-quantities';
 import { dailyProductPlans, productWeekdays, products } from '@/server/db/schema';
 import { getRemainingAvailability } from '@/server/domain/availability';
-import { PickupDateUnavailableError } from '@/server/domain/errors';
 import { checkProductOffered, getOnlineCutoff } from '@/server/domain/reservation-rules';
-import { assertPickupDateAvailable } from '../eligibility';
+import { assertPickupDateAvailable, groupWeekdaysByProduct } from '../eligibility';
 
 export type AvailableProduct = {
     id: string;
@@ -33,9 +31,6 @@ export const getAvailableProducts = async (
     pickupDate: string,
     options: { now?: Date } = {},
 ): Promise<ProductCatalog> => {
-    if (!isValidCalendarDate(pickupDate)) {
-        throw new PickupDateUnavailableError('INVALID_DATE');
-    }
     const db = getDb();
     await assertPickupDateAvailable(db, pickupDate, 'online', options.now ?? new Date());
 
@@ -72,12 +67,14 @@ export const getAvailableProducts = async (
                   .from(productWeekdays)
                   .where(inArray(productWeekdays.productId, ids))
             : [];
-    const offered = rows.filter((row) => {
-        const weekdays = weekdayRows
-            .filter((weekdayRow) => weekdayRow.productId === row.id)
-            .map((weekdayRow) => weekdayRow.weekday);
-        return checkProductOffered({ active: true, weekdays }, pickupDate).ok;
-    });
+    const weekdaysByProduct = groupWeekdaysByProduct(weekdayRows);
+    const offered = rows.filter(
+        (row) =>
+            checkProductOffered(
+                { active: true, weekdays: weekdaysByProduct.get(row.id) ?? [] },
+                pickupDate,
+            ).ok,
+    );
     const committed = await getCommittedQuantities(
         db,
         pickupDate,

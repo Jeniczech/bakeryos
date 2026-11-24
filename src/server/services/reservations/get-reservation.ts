@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { getDb, type DbExecutor } from '@/server/db/client';
 import { reservationItems, reservations } from '@/server/db/schema';
 import { ReservationNotFoundError } from '@/server/domain/errors';
@@ -7,7 +7,7 @@ import {
     isBeforeOnlineCutoff,
     type ReservationStatus,
 } from '@/server/domain/reservation-rules';
-import type { ReservationConfirmationItem } from './create-reservation';
+import { compareConfirmationItems, type ReservationConfirmationItem } from './create-reservation';
 import { hashManagementToken, isWellFormedManagementToken } from './management-token';
 
 /** What a management-link holder may see; the phone number is deliberately left out. */
@@ -59,8 +59,7 @@ export const loadReservationDetails = async (
             quantity: reservationItems.quantity,
         })
         .from(reservationItems)
-        .where(eq(reservationItems.reservationId, reservationId))
-        .orderBy(asc(reservationItems.productNameSnapshot), asc(reservationItems.productId));
+        .where(eq(reservationItems.reservationId, reservationId));
     return {
         reservationId: reservation.id,
         reservationNumber: reservation.reservationNumber,
@@ -68,7 +67,7 @@ export const loadReservationDetails = async (
         status: reservation.status,
         customerName: reservation.customerName,
         totalPrice: items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
-        items,
+        items: items.sort(compareConfirmationItems),
         cancellationCutoff: getOnlineCutoff(reservation.pickupDate),
         canCancel:
             reservation.status === 'confirmed' && isBeforeOnlineCutoff(reservation.pickupDate, now),

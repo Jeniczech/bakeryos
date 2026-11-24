@@ -1,4 +1,5 @@
 import { eq, inArray } from 'drizzle-orm';
+import { isValidCalendarDate } from '@/lib/date-time/prague';
 import type { DbExecutor } from '@/server/db/client';
 import { bakeryClosures, bakeryOpeningDays, productWeekdays, products } from '@/server/db/schema';
 import {
@@ -30,6 +31,18 @@ const loadSchedule = async (db: DbExecutor, date: string): Promise<BakerySchedul
     };
 };
 
+export const groupWeekdaysByProduct = (
+    rows: readonly { productId: string; weekday: number }[],
+): Map<string, number[]> => {
+    const weekdaysByProduct = new Map<string, number[]>();
+    for (const { productId, weekday } of rows) {
+        const weekdays = weekdaysByProduct.get(productId) ?? [];
+        weekdays.push(weekday);
+        weekdaysByProduct.set(productId, weekdays);
+    }
+    return weekdaysByProduct;
+};
+
 /** Rejects dates outside the source's booking window, after its cutoff, or on closed days. */
 export const assertPickupDateAvailable = async (
     db: DbExecutor,
@@ -37,6 +50,10 @@ export const assertPickupDateAvailable = async (
     source: ReservationSource,
     now: Date,
 ): Promise<void> => {
+    // Checked before querying, where an impossible date would fail as a SQL error.
+    if (!isValidCalendarDate(pickupDate)) {
+        throw new PickupDateUnavailableError('INVALID_DATE');
+    }
     const schedule = await loadSchedule(db, pickupDate);
     const dateCheck = checkPickupDate({ pickupDate, source, now, schedule });
     if (!dateCheck.ok) {
@@ -65,12 +82,7 @@ export const loadOfferedProducts = async (
         .where(inArray(productWeekdays.productId, [...productIds]));
 
     const rowsById = new Map(rows.map((row) => [row.id, row]));
-    const weekdaysByProduct = new Map<string, number[]>();
-    for (const { productId, weekday } of weekdayRows) {
-        const weekdays = weekdaysByProduct.get(productId) ?? [];
-        weekdays.push(weekday);
-        weekdaysByProduct.set(productId, weekdays);
-    }
+    const weekdaysByProduct = groupWeekdaysByProduct(weekdayRows);
     const offered: OfferedProduct[] = [];
     const unavailable: UnavailableProduct[] = [];
     for (const productId of productIds) {

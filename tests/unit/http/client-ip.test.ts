@@ -11,10 +11,17 @@ describe('getClientIp', () => {
         expect(getClientIp(headers)).toBe('203.0.113.7');
     });
 
-    it('falls back to the first x-forwarded-for entry', () => {
-        const headers = new Headers({ 'x-forwarded-for': ' 198.51.100.1 , 10.0.0.1' });
+    it('falls back to the last x-forwarded-for entry, which the nearest proxy appended', () => {
+        const headers = new Headers({ 'x-forwarded-for': ' 198.51.100.1 , 203.0.113.9 ' });
 
-        expect(getClientIp(headers)).toBe('198.51.100.1');
+        expect(getClientIp(headers)).toBe('203.0.113.9');
+    });
+
+    it('ignores client-supplied x-forwarded-for entries before the proxy entry', () => {
+        const first = new Headers({ 'x-forwarded-for': 'spoofed-1, 203.0.113.9' });
+        const second = new Headers({ 'x-forwarded-for': 'spoofed-2, 203.0.113.9' });
+
+        expect(getClientIp(first)).toBe(getClientIp(second));
     });
 
     it('uses a shared bucket when no IP header is present', () => {

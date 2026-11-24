@@ -262,7 +262,7 @@ Trusted input includes idempotency key, pickup date, customer name/phone, produc
 4. If found: compare hashes; return existing confirmation or reject conflicting reuse.
 5. Validate the date against the source-specific booking window, bakery opening, product weekdays, and product activity. Apply cutoff **only for online source**.
 6. Materialize and lock daily plans in deterministic order.
-7. Re-check the idempotency key, then re-read eligibility and aggregate committed quantities after locking.
+7. Re-check the idempotency key, then re-read eligibility and aggregate committed quantities after locking. Read the clock again for this check: the lock wait may cross the cutoff.
 8. Validate the entire cart against capacity.
 9. Read authoritative prices and insert reservation with item snapshots.
 10. Commit and return confirmation plus management URL.
@@ -297,12 +297,14 @@ Management tokens are bearer credentials. Do not log them, include them in analy
 2. Identify affected products and pickup date.
 3. Begin transaction, materialize and lock relevant daily plans in deterministic order.
 4. Re-read reservation state **after locks**; require `confirmed`.
-5. Calculate the exact cutoff for that pickup date in `Europe/Prague`.
+5. Read the current time **after the locks are acquired** (the lock wait may cross the cutoff) and calculate the exact cutoff for that pickup date in `Europe/Prague`.
 6. Reject customer cancellation at or after cutoff; admin cancellation is allowed.
 7. Set `status = cancelled`, `cancelled_at = now`, and `retain_for_production = (now >= cutoff)`.
 8. Commit.
 
 A repeated cancellation must have no additional side effects; returning the already-cancelled state is acceptable.
+
+Retry only recognized transient database conflicts (deadlock, serialization failure), with the same bounded retries as creation (§6.2).
 
 ### 6.5 `updateReservationStatus(input)`
 
@@ -573,6 +575,7 @@ DATABASE_URL=            # pooled connection for runtime
 DATABASE_URL_UNPOOLED=   # direct connection for migrations, if required
 AUTH_SECRET=
 MANAGEMENT_TOKEN_SECRET=
+APP_URL=                 # canonical origin for customer links; empty locally = request origin
 ADMIN_SEED_EMAIL=
 ADMIN_SEED_PASSWORD=
 ```
@@ -584,6 +587,7 @@ Never commit real secrets.
 - Netlify for Next.js; Neon for PostgreSQL.
 - Deploy an early spike that verifies, in a deployed Netlify Function: interactive transactions and `SELECT ... FOR UPDATE` through Neon's pooled connection, a minimal concurrent locking test, and Argon2id hash/verify (§2.1, §2.2).
 - Configure environment variables and run migrations explicitly.
+- Set `APP_URL` to the production URL in every deploy context. Deploy Previews share the production database, so management links must not point at the preview host.
 - Seed demo admin and catalog; do not run destructive seed automatically on every deployment.
 - Verify authentication, reservation creation, and concurrency behavior in the deployed environment.
 - Deliver public URL, admin URL, and demo credentials.
