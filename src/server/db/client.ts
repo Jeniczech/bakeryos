@@ -1,9 +1,15 @@
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import type { ExtractTablesWithRelations } from 'drizzle-orm';
+import { drizzle, type NodePgDatabase, type NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
+import type { PgTransaction } from 'drizzle-orm/pg-core';
 import { Pool } from 'pg';
 import * as schema from './schema';
 
 export type Database = NodePgDatabase<typeof schema>;
-export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
+export type Transaction = PgTransaction<
+    NodePgQueryResultHKT,
+    typeof schema,
+    ExtractTablesWithRelations<typeof schema>
+>;
 export type DbExecutor = Database | Transaction;
 
 type DbConnection = { pool: Pool; db: Database };

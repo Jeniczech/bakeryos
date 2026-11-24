@@ -145,6 +145,20 @@ describe('getCommittedQuantities', () => {
         expect(committed.get(bread.id)).toEqual({ activeReserved: 4, retainedCancelled: 0 });
     });
 
+    it('returns totals beyond the 32-bit integer range', async () => {
+        const bread = await insertProduct();
+        const db = getDb();
+        await insertReservation(db, { items: [{ productId: bread.id, quantity: 1_500_000_000 }] });
+        await insertReservation(db, { items: [{ productId: bread.id, quantity: 1_500_000_000 }] });
+
+        const committed = await getCommittedQuantities(db, DATE, [bread.id]);
+
+        expect(committed.get(bread.id)).toEqual({
+            activeReserved: 3_000_000_000,
+            retainedCancelled: 0,
+        });
+    });
+
     it('returns zeros for products without reservations and nothing for an empty list', async () => {
         const unknownId = randomUUID();
 
