@@ -1,3 +1,4 @@
+import type { ZodError } from 'zod';
 import type { PickupDateRejectionReason, ProductRejectionReason } from './reservation-rules';
 
 /** Expected business rejections; transports map `code` to a response (e.g. Problem Details). */
@@ -12,11 +13,17 @@ export abstract class DomainError extends Error {
 
 export type ValidationIssue = { path: string; message: string };
 
-export class InvalidReservationRequestError extends DomainError {
+export const toValidationIssues = (error: ZodError): ValidationIssue[] =>
+    error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message }));
+
+export class InvalidRequestError extends DomainError {
     readonly code = 'INVALID_REQUEST';
 
-    constructor(readonly issues: readonly ValidationIssue[]) {
-        super('The reservation request is invalid.');
+    constructor(
+        readonly issues: readonly ValidationIssue[],
+        message = 'The request is invalid.',
+    ) {
+        super(message);
     }
 }
 
@@ -76,14 +83,6 @@ export class IdempotencyConflictError extends DomainError {
 
     constructor() {
         super('This idempotency key was already used for a different request.');
-    }
-}
-
-export class InvalidDailyPlanUpdateError extends DomainError {
-    readonly code = 'INVALID_REQUEST';
-
-    constructor(readonly issues: readonly ValidationIssue[]) {
-        super('The daily plan update is invalid.');
     }
 }
 

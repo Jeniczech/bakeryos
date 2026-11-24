@@ -1,21 +1,33 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, inArray } from 'drizzle-orm';
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
-import { pragueTimeToInstant } from '@/lib/date-time/prague';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { addDays, getWeekday, pragueTimeToInstant } from '@/lib/date-time/prague';
 import { closeDb, getDb } from '@/server/db/client';
-import { dailyProductPlans, products, reservationItems, reservations } from '@/server/db/schema';
 import {
-    InvalidDailyPlanUpdateError,
+    bakeryClosures,
+    bakeryOpeningDays,
+    dailyProductPlans,
+    productWeekdays,
+    products,
+    reservationItems,
+    reservations,
+} from '@/server/db/schema';
+import {
+    InvalidRequestError,
+    PickupDateUnavailableError,
     PlanBelowCommitmentsError,
     ProductNotFoundError,
+    ProductUnavailableError,
 } from '@/server/domain/errors';
 import type { ReservationStatus } from '@/server/domain/reservation-rules';
 import { updateDailyPlan } from '@/server/services/production/update-daily-plan';
 
 // Far outside any real booking window; the clock is injected relative to these dates.
-const DATE = '2099-06-10';
-const TODAY = '2099-06-09';
+const DATE = '2099-06-10'; // Wednesday
+const TODAY = '2099-06-09'; // Tuesday
 const YESTERDAY = '2099-06-08';
+// A Tuesday closure on the last day of the admin booking window, cleaned up after the test.
+const CLOSED_DATE = '2099-06-16';
 // After the online cutoff for DATE: admins may still edit its plan.
 const NOW = pragueTimeToInstant(TODAY, 20);
 
@@ -68,7 +80,16 @@ const readPlan = async (productId: string, date = DATE) => {
     return plan;
 };
 
+beforeAll(async () => {
+    // The seed opens Tuesdays and Wednesdays; add the rows only if the schedule is missing.
+    await getDb()
+        .insert(bakeryOpeningDays)
+        .values([TODAY, DATE].map((date) => ({ weekday: getWeekday(date), isOpen: true })))
+        .onConflictDoNothing();
+});
+
 afterEach(async () => {
+    await getDb().delete(bakeryClosures).where(eq(bakeryClosures.date, CLOSED_DATE));
     const productIds = createdProductIds.splice(0);
     if (productIds.length === 0) {
         return;
@@ -213,10 +234,8 @@ describe('updateDailyPlan', () => {
             { now: NOW },
         );
 
-        await expect(rejected).rejects.toBeInstanceOf(InvalidDailyPlanUpdateError);
-        const error = (await rejected.catch(
-            (caught: unknown) => caught,
-        )) as InvalidDailyPlanUpdateError;
+        await expect(rejected).rejects.toBeInstanceOf(InvalidRequestError);
+        const error = (await rejected.catch((caught: unknown) => caught)) as InvalidRequestError;
         expect(error.issues.map((issue) => issue.path).sort()).toEqual(['date', 'walkInQuantity']);
 
         for (const invalid of [
@@ -226,14 +245,14 @@ describe('updateDailyPlan', () => {
         ]) {
             await expect(
                 updateDailyPlan({ productId: bread.id, date: DATE, ...invalid }, { now: NOW }),
-            ).rejects.toBeInstanceOf(InvalidDailyPlanUpdateError);
+            ).rejects.toBeInstanceOf(InvalidRequestError);
         }
         await expect(
             updateDailyPlan(
                 { productId: 'not-a-uuid', date: DATE, capacity: 1, walkInQuantity: 0 },
                 { now: NOW },
             ),
-        ).rejects.toBeInstanceOf(InvalidDailyPlanUpdateError);
+        ).rejects.toBeInstanceOf(InvalidRequestError);
     });
 
     it('rejects an unknown product', async () => {
@@ -245,5 +264,44 @@ describe('updateDailyPlan', () => {
                 { now: NOW },
             ),
         ).rejects.toEqual(new ProductNotFoundError(productId));
+    });
+    it('rejects dates beyond the admin booking window or when the bakery is closed', async () => {
+        const bread = await insertProduct();
+        await getDb().insert(bakeryClosures).values({ date: CLOSED_DATE, reason: 'Test' });
+        const beyondWindow = addDays(TODAY, 8);
+
+        for (const [date, code] of [
+            [beyondWindow, 'OUTSIDE_BOOKING_WINDOW'],
+            [CLOSED_DATE, 'BAKERY_CLOSED'],
+        ] as const) {
+            const rejected = updateDailyPlan(
+                { productId: bread.id, date, capacity: 5, walkInQuantity: 0 },
+                { now: NOW },
+            );
+            await expect(rejected).rejects.toBeInstanceOf(PickupDateUnavailableError);
+            await expect(rejected).rejects.toMatchObject({ code });
+            expect(await readPlan(bread.id, date)).toBeUndefined();
+        }
+    });
+
+    it('rejects inactive products and products not offered on the date', async () => {
+        const inactive = await insertProduct({ active: false });
+        const thursdaysOnly = await insertProduct();
+        await getDb().insert(productWeekdays).values({ productId: thursdaysOnly.id, weekday: 4 });
+
+        for (const [product, reason] of [
+            [inactive, 'PRODUCT_INACTIVE'],
+            [thursdaysOnly, 'PRODUCT_NOT_OFFERED_ON_DATE'],
+        ] as const) {
+            const rejected = updateDailyPlan(
+                { productId: product.id, date: DATE, capacity: 5, walkInQuantity: 0 },
+                { now: NOW },
+            );
+            await expect(rejected).rejects.toBeInstanceOf(ProductUnavailableError);
+            await expect(rejected).rejects.toMatchObject({
+                products: [{ productId: product.id, reason }],
+            });
+            expect(await readPlan(product.id)).toBeUndefined();
+        }
     });
 });

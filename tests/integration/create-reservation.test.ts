@@ -14,7 +14,7 @@ import {
 import {
     IdempotencyConflictError,
     InsufficientCapacityError,
-    InvalidReservationRequestError,
+    InvalidRequestError,
     OnlineQuantityLimitError,
     PickupDateUnavailableError,
     ProductUnavailableError,
@@ -259,10 +259,8 @@ describe('createReservation', () => {
             buildInput([], { customer: { name: ' ', phone: '123' }, pickupDate: '2099-02-30' }),
             { now: BEFORE_CUTOFF },
         );
-        await expect(attempt).rejects.toBeInstanceOf(InvalidReservationRequestError);
-        const error = (await attempt.catch(
-            (caught: unknown) => caught,
-        )) as InvalidReservationRequestError;
+        await expect(attempt).rejects.toBeInstanceOf(InvalidRequestError);
+        const error = (await attempt.catch((caught: unknown) => caught)) as InvalidRequestError;
         expect(error.issues.map((issue) => issue.path)).toEqual(
             expect.arrayContaining(['pickupDate', 'customer.name', 'customer.phone', 'items']),
         );
