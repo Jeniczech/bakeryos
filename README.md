@@ -27,6 +27,30 @@ The seed is safe to re-run: it upserts the opening days and administrator (reset
 
 `GET /api/health` returns `{"status":"ok","database":"ok"}` when the database is reachable, `503` otherwise.
 
+## Public API
+
+| Endpoint                                      | Purpose                                                                                    |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `GET /api/products?date=YYYY-MM-DD`           | Online catalog for a pickup date with prices (haléře) and remaining quantity               |
+| `POST /api/reservations`                      | Create a reservation (`201`); same idempotency key and payload replays it (`200`)          |
+| `GET /api/reservations/manage/:token`         | Reservation details and whether the customer can still cancel                              |
+| `POST /api/reservations/manage/:token/cancel` | Customer cancellation, strictly before 18:00 Prague time the day before pickup; repeatable |
+
+Request body for `POST /api/reservations` (TDD §8); any `source` or price fields are ignored:
+
+```json
+{
+    "idempotencyKey": "d6c7c4a8-61e2-4a41-89c7-4d3f61b3a825",
+    "pickupDate": "2026-11-27",
+    "customer": { "name": "Jane Doe", "phone": "+420777123456" },
+    "items": [{ "productId": "<product uuid>", "quantity": 2 }]
+}
+```
+
+Errors are RFC 9457 Problem Details (`application/problem+json`) with a stable `code`, e.g. `INSUFFICIENT_CAPACITY` (409, with a `shortages` array), `CUTOFF_PASSED` (409), `IDEMPOTENCY_CONFLICT` (409), `RESERVATION_NOT_FOUND` (404), `RATE_LIMITED` (429 with `Retry-After`). Reservation creation is limited to 10 requests per client IP per 10 minutes, counted in the `rate_limits` table.
+
+Management links (`/reservations/manage/:token`) are bearer credentials. The application never logs them and all reservation responses are sent with `Cache-Control: no-store`, but the token is part of the URL path, so request logs outside the application (the Next.js dev server, hosting access logs) can contain it.
+
 ## Scripts
 
 | Script                                        | Purpose                                                            |
