@@ -10,6 +10,9 @@
         "typecheck": "next typegen && tsc --noEmit",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
+        "test": "vitest run tests/unit",
+        "test:watch": "vitest tests/unit",
+        "test:integration": "vitest run tests/integration",
         "db:up": "docker compose up -d --wait postgres",
         "db:down": "docker compose down",
         "db:generate": "drizzle-kit generate",
@@ -36,7 +39,8 @@
         "prettier": "3.10.1",
         "prettier-plugin-tailwindcss": "0.8.1",
         "tailwindcss": "4.3.3",
-        "typescript": "^5"
+        "typescript": "^5",
+        "vitest": "5.1.1"
     },
     "packageManager": "pnpm@10.33.0"
 }

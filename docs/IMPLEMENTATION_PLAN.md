@@ -33,7 +33,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Initialize Next.js App Router, strict TypeScript, and Tailwind CSS.
 - [x] Set up PostgreSQL, Drizzle, Drizzle Kit, and Docker Compose.
 - [x] Establish basic project folders from the TDD.
-- [ ] Create `.env.example` and package scripts.
+- [x] Create `.env.example` and package scripts.
 - [ ] Add `/api/health` that checks DB connectivity.
 - [ ] Deploy a minimal version to Netlify connected to Neon.
 - [ ] Use Neon's **pooled** connection string for runtime connections; keep migrations on a separate (unpooled) connection if the migration tooling requires it.
