@@ -30,8 +30,8 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 
 ### Tasks
 
-- [ ] Initialize Next.js App Router, strict TypeScript, and Tailwind CSS.
-- [ ] Set up PostgreSQL, Drizzle, Drizzle Kit, and Docker Compose.
+- [x] Initialize Next.js App Router, strict TypeScript, and Tailwind CSS.
+- [x] Set up PostgreSQL, Drizzle, Drizzle Kit, and Docker Compose.
 - [ ] Establish basic project folders from the TDD.
 - [ ] Create `.env.example` and package scripts.
 - [ ] Add `/api/health` that checks DB connectivity.
