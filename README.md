@@ -17,24 +17,29 @@ pnpm install
 cp .env.example .env       # local defaults point at Docker PostgreSQL
 pnpm db:up                 # start PostgreSQL 18 and wait until healthy
 pnpm db:migrate            # apply migrations to the local database
+pnpm db:seed               # schedule, demo catalog, admin (set ADMIN_SEED_PASSWORD first)
 pnpm dev                   # http://localhost:3000
 ```
+
+The seed is safe to re-run: it upserts the opening days and administrator (resetting the admin password from `ADMIN_SEED_PASSWORD`, min. 12 characters), adds missing closures, and inserts the demo catalog only when the `products` table is empty.
 
 `GET /api/health` returns `{"status":"ok","database":"ok"}` when the database is reachable, `503` otherwise.
 
 ## Scripts
 
-| Script                                        | Purpose                                                         |
-| --------------------------------------------- | --------------------------------------------------------------- |
-| `dev`, `build`, `start`                       | Next.js                                                         |
-| `lint`, `typecheck`, `format`, `format:check` | Code quality                                                    |
-| `test`                                        | Unit tests (`tests/unit`)                                       |
-| `test:integration`                            | Integration tests against real PostgreSQL (`tests/integration`) |
-| `db:up`, `db:down`                            | Start/stop local PostgreSQL                                     |
-| `db:generate`                                 | Generate a migration from `src/server/db/schema.ts`             |
-| `db:migrate`                                  | Apply migrations to the database in `.env`                      |
-| `db:migrate:prod`                             | Apply migrations to Neon using `.env.neon`                      |
-| `db:studio`                                   | Drizzle Studio                                                  |
+| Script                                        | Purpose                                                            |
+| --------------------------------------------- | ------------------------------------------------------------------ |
+| `dev`, `build`, `start`                       | Next.js                                                            |
+| `lint`, `typecheck`, `format`, `format:check` | Code quality                                                       |
+| `test`                                        | Unit tests (`tests/unit`)                                          |
+| `test:integration`                            | Integration tests against real PostgreSQL (`tests/integration`)    |
+| `db:up`, `db:down`                            | Start/stop local PostgreSQL                                        |
+| `db:generate`                                 | Generate a migration from `src/server/db/schema.ts`                |
+| `db:migrate`                                  | Apply migrations to the database in `.env`                         |
+| `db:migrate:prod`                             | Apply migrations to Neon using `.env.neon`                         |
+| `db:seed`                                     | Seed schedule, demo catalog, and admin into the database in `.env` |
+| `db:seed:prod`                                | Seed Neon using `.env.neon`                                        |
+| `db:studio`                                   | Drizzle Studio                                                     |
 
 ## Production (Netlify + Neon)
 
