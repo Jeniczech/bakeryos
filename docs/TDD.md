@@ -53,9 +53,13 @@ All capacity-sensitive workflows require **connection-bound interactive PostgreS
 - **Runtime connections** use Neon's **pooled** connection string (`DATABASE_URL`), to avoid exhausting connections from serverless functions. The pooler runs in transaction mode; the spike must confirm that interactive transactions and `SELECT ... FOR UPDATE` behave correctly through it.
 - **Migrations** use the direct (unpooled) connection string (`DATABASE_URL_UNPOOLED`) if the migration tooling requires session-level features.
 
+**Verified in Stage 1:** Drizzle with `drizzle-orm/node-postgres` (`pg` Pool) through Neon's pooled connection, on a Netlify Deploy Preview (Linux x64, Node 24). Ten concurrent `SELECT ... FOR UPDATE` claims for one unit, both within one function and across function instances, produced exactly one claim and a consistent final row; a no-lock baseline oversold, confirming the test detects lost updates. Neon runs PostgreSQL 18 in AWS `us-east-2`, co-located with Netlify Functions (`us-east-2`); local Docker also uses PostgreSQL 18.
+
 ### 2.2 Password hashing requirement
 
 Argon2id hashing and verification must work inside a **deployed Netlify Function**, not only at build time. Keep Argon2id if compatible; if it is not, propose an alternative and obtain approval before changing the hashing approach.
+
+**Verified in Stage 1:** `@node-rs/argon2` (prebuilt native binaries, no `node-gyp`) with Argon2id defaults `m=19456, t=2, p=1` hashes and verifies inside a deployed Netlify Function (~30–60 ms per operation). Deployments must be built by Netlify from Git: a local `netlify deploy` from macOS bundles the wrong native binary.
 
 ## 3. Product scope
 
