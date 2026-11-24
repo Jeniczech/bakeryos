@@ -69,7 +69,10 @@ The installed Next.js version may differ from your training data. Before writing
 4. List any deviations from the specification.
 5. Report test results and remaining risks.
 6. Mark completed tasks as checked (`- [x]`) in `docs/IMPLEMENTATION_PLAN.md`.
-7. Wait for approval before proceeding.
+7. Check whether the stage changed or verified anything the docs should record
+   (decisions, deviations, setup or deployment steps). Update `README.md` directly;
+   propose changes to `docs/PRD.md` or `docs/TDD.md` and apply them only after approval.
+8. Wait for approval before proceeding.
 
 Never claim a test passed unless it was actually executed successfully.
 
