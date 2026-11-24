@@ -430,6 +430,23 @@ describe('createReservation', () => {
             expect(await readReservations([bread.id])).toHaveLength(1);
         });
 
+        it('fails loudly instead of replaying a dead link after the token secret changes', async () => {
+            const bread = await insertProduct();
+            const input = buildInput([{ productId: bread.id, quantity: 1 }]);
+            await createReservation(input, { now: BEFORE_CUTOFF });
+
+            const original = process.env.MANAGEMENT_TOKEN_SECRET;
+            process.env.MANAGEMENT_TOKEN_SECRET = 'a-different-secret-that-is-at-least-32-chars';
+            try {
+                await expect(createReservation(input, { now: BEFORE_CUTOFF })).rejects.toThrow(
+                    /does not match its stored hash/,
+                );
+            } finally {
+                process.env.MANAGEMENT_TOKEN_SECRET = original;
+            }
+            expect(await readReservations([bread.id])).toHaveLength(1);
+        });
+
         it('creates one reservation when the same request is submitted concurrently', async () => {
             const bread = await insertProduct({ defaultCapacity: 10 });
             const input = buildInput([{ productId: bread.id, quantity: 3 }]);
@@ -460,6 +477,44 @@ describe('createReservation', () => {
                 createReservation(input, { now: BEFORE_CUTOFF }),
                 createReservation(
                     { ...input, items: [{ productId: bread.id, quantity: 2 }] },
+                    { now: BEFORE_CUTOFF },
+                ),
+            ]);
+
+            const fulfilled = outcomes.filter((outcome) => outcome.status === 'fulfilled');
+            const rejected = outcomes.filter((outcome) => outcome.status === 'rejected');
+            expect(fulfilled).toHaveLength(1);
+            expect(rejected).toHaveLength(1);
+            expect(rejected[0].reason).toBeInstanceOf(IdempotencyConflictError);
+            expect(await readReservations([bread.id])).toHaveLength(1);
+        });
+
+        it('replays rather than reporting no capacity when a concurrent same-key request takes all of it', async () => {
+            const bread = await insertProduct({ defaultCapacity: 10 });
+            const input = buildInput([{ productId: bread.id, quantity: 10 }]);
+
+            const results = await Promise.all(
+                Array.from({ length: 5 }, () => createReservation(input, { now: BEFORE_CUTOFF })),
+            );
+
+            const created = results.filter((result) => !result.replayed);
+            expect(created).toHaveLength(1);
+            for (const result of results) {
+                expect(result).toEqual({ ...created[0], replayed: result.replayed });
+            }
+            expect(await readReservations([bread.id])).toEqual([
+                { id: created[0].reservationId },
+            ]);
+        });
+
+        it('reports a conflict rather than no capacity for a concurrent same-key payload', async () => {
+            const bread = await insertProduct({ defaultCapacity: 10 });
+            const input = buildInput([{ productId: bread.id, quantity: 10 }]);
+
+            const outcomes = await Promise.allSettled([
+                createReservation(input, { now: BEFORE_CUTOFF }),
+                createReservation(
+                    { ...input, items: [{ productId: bread.id, quantity: 9 }] },
                     { now: BEFORE_CUTOFF },
                 ),
             ]);

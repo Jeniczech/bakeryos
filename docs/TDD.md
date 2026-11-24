@@ -262,7 +262,7 @@ Trusted input includes idempotency key, pickup date, customer name/phone, produc
 4. If found: compare hashes; return existing confirmation or reject conflicting reuse.
 5. Validate the date against the source-specific booking window, bakery opening, product weekdays, and product activity. Apply cutoff **only for online source**.
 6. Materialize and lock daily plans in deterministic order.
-7. Re-read eligibility and aggregate committed quantities after locking.
+7. Re-check the idempotency key, then re-read eligibility and aggregate committed quantities after locking.
 8. Validate the entire cart against capacity.
 9. Read authoritative prices and insert reservation with item snapshots.
 10. Commit and return confirmation plus management URL.

@@ -21,7 +21,11 @@ import {
     reservations,
     reservationSources,
 } from '@/server/db/schema';
-import { getRemainingAvailability, type CommittedQuantities } from '@/server/domain/availability';
+import {
+    canReserve,
+    getRemainingAvailability,
+    type CommittedQuantities,
+} from '@/server/domain/availability';
 import {
     IdempotencyConflictError,
     InsufficientCapacityError,
@@ -149,6 +153,12 @@ const loadOfferedProducts = async (
         .where(inArray(productWeekdays.productId, [...productIds]));
 
     const rowsById = new Map(rows.map((row) => [row.id, row]));
+    const weekdaysByProduct = new Map<string, number[]>();
+    for (const { productId, weekday } of weekdayRows) {
+        const weekdays = weekdaysByProduct.get(productId) ?? [];
+        weekdays.push(weekday);
+        weekdaysByProduct.set(productId, weekdays);
+    }
     const offered: OfferedProduct[] = [];
     const unavailable: UnavailableProduct[] = [];
     for (const productId of productIds) {
@@ -157,9 +167,7 @@ const loadOfferedProducts = async (
             unavailable.push({ productId, reason: 'PRODUCT_NOT_FOUND' });
             continue;
         }
-        const weekdays = weekdayRows
-            .filter((weekdayRow) => weekdayRow.productId === productId)
-            .map((weekdayRow) => weekdayRow.weekday);
+        const weekdays = weekdaysByProduct.get(productId) ?? [];
         const check = checkProductOffered({ active: row.active, weekdays }, pickupDate);
         if (check.ok) {
             offered.push({ id: row.id, name: row.name, price: row.price });
@@ -187,16 +195,16 @@ const assertCapacity = (
         if (!plan || !quantities) {
             throw new Error(`Missing locked plan or commitments for product ${item.productId}`);
         }
-        const available = getRemainingAvailability({
+        const planQuantities = {
             capacity: plan.capacity,
             walkInQuantity: plan.walkInQuantity,
             ...quantities,
-        });
-        if (item.quantity > available) {
+        };
+        if (!canReserve(planQuantities, item.quantity)) {
             shortages.push({
                 productId: item.productId,
                 requested: item.quantity,
-                available: Math.max(0, available),
+                available: Math.max(0, getRemainingAvailability(planQuantities)),
             });
         }
     }
@@ -213,6 +221,7 @@ const buildResult = (
         status: ReservationStatus;
     },
     items: ReservationConfirmationItem[],
+    managementToken: string,
     replayed: boolean,
 ): CreateReservationResult => ({
     reservationId: reservation.id,
@@ -221,7 +230,7 @@ const buildResult = (
     status: reservation.status,
     totalPrice: items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
     items,
-    managementToken: deriveManagementToken(reservation.id),
+    managementToken,
     replayed,
 });
 
@@ -244,6 +253,13 @@ const findReplay = async (
     if (existing.requestHash !== requestHash) {
         throw new IdempotencyConflictError();
     }
+    // The token is re-derived, not stored, so a changed secret would silently hand out a dead link.
+    const managementToken = deriveManagementToken(existing.id);
+    if (hashManagementToken(managementToken) !== existing.managementTokenHash) {
+        throw new Error(
+            `Management token for reservation ${existing.id} does not match its stored hash; was MANAGEMENT_TOKEN_SECRET changed?`,
+        );
+    }
     const items = await db
         .select({
             productId: reservationItems.productId,
@@ -254,7 +270,20 @@ const findReplay = async (
         .from(reservationItems)
         .where(eq(reservationItems.reservationId, existing.id))
         .orderBy(asc(reservationItems.productId));
-    return buildResult(existing, items, true);
+    return buildResult(existing, items, managementToken, true);
+};
+
+const assertPickupDateAvailable = async (
+    tx: Transaction,
+    pickupDate: string,
+    source: ReservationSource,
+    now: Date,
+): Promise<void> => {
+    const schedule = await loadSchedule(tx, pickupDate);
+    const dateCheck = checkPickupDate({ pickupDate, source, now, schedule });
+    if (!dateCheck.ok) {
+        throw new PickupDateUnavailableError(dateCheck.reason);
+    }
 };
 
 const createInTransaction = async (
@@ -269,22 +298,25 @@ const createInTransaction = async (
         return replay;
     }
 
-    const schedule = await loadSchedule(tx, request.pickupDate);
-    const dateCheck = checkPickupDate({ pickupDate: request.pickupDate, source, now, schedule });
-    if (!dateCheck.ok) {
-        throw new PickupDateUnavailableError(dateCheck.reason);
-    }
-
+    // Rejects ineligible dates and products before materializing or locking any plan.
+    await assertPickupDateAvailable(tx, request.pickupDate, source, now);
     const productIds = request.items.map((item) => item.productId);
-    // Rejects unknown or unavailable products before materializing or locking any plan.
     await loadOfferedProducts(tx, productIds, request.pickupDate);
     const plans = await lockDailyPlans(tx, request.pickupDate, productIds);
-    // Re-read after locking so eligibility and the price/name snapshots are current.
+    // A same-key request that held these locks has now committed; replay it before its
+    // quantities can make this one look like a capacity shortage.
+    const lockedReplay = await findReplay(tx, request.idempotencyKey, requestHash);
+    if (lockedReplay) {
+        return lockedReplay;
+    }
+    // Re-check after locking so eligibility and the price/name snapshots are current.
+    await assertPickupDateAvailable(tx, request.pickupDate, source, now);
     const offered = await loadOfferedProducts(tx, productIds, request.pickupDate);
     const committed = await getCommittedQuantities(tx, request.pickupDate, productIds);
     assertCapacity(request.items, plans, committed);
 
     const reservationId = randomUUID();
+    const managementToken = deriveManagementToken(reservationId);
     const [reservation] = await tx
         .insert(reservations)
         .values({
@@ -293,7 +325,7 @@ const createInTransaction = async (
             customerName: request.customer.name,
             customerPhone: request.customer.phone,
             source,
-            managementTokenHash: hashManagementToken(deriveManagementToken(reservationId)),
+            managementTokenHash: hashManagementToken(managementToken),
             idempotencyKey: request.idempotencyKey,
             requestHash,
         })
@@ -315,7 +347,7 @@ const createInTransaction = async (
         })),
     );
 
-    return buildResult(reservation, items, false);
+    return buildResult(reservation, items, managementToken, false);
 };
 
 /**
