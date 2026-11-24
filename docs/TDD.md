@@ -463,12 +463,15 @@ Use **RFC 9457 Problem Details** (`Content-Type: application/problem+json`), typ
   "type": "about:blank",
   "title": "Insufficient capacity",
   "status": 409,
-  "detail": "Only 1 unit is available.",
+  "detail": "Some products do not have enough remaining capacity.",
   "code": "INSUFFICIENT_CAPACITY",
-  "available": 1,
-  "requested": 2
+  "shortages": [
+    { "productId": "a-valid-product-uuid", "requested": 2, "available": 1 }
+  ]
 }
 ```
+
+A cart can be short on several products at once, so capacity errors list every shortage.
 
 Conventions: `400` malformed input, `401` unauthenticated, `403` forbidden, `404` not found, `409` state/cutoff/capacity/idempotency conflict, `422` semantically invalid input, `429` rate limit exceeded (with `Retry-After`), `500` unexpected error. Never expose SQL details or stack traces.
 
