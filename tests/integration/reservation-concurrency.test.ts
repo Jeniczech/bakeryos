@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { pragueTimeToInstant } from '@/lib/date-time/prague';
 import { closeDb, getDb } from '@/server/db/client';
 import { getCommittedQuantities } from '@/server/db/committed-quantities';
@@ -16,7 +16,12 @@ import {
     reservations,
 } from '@/server/db/schema';
 import { getCommittedQuantity } from '@/server/domain/availability';
-import { InsufficientCapacityError, PlanBelowCommitmentsError } from '@/server/domain/errors';
+import {
+    InsufficientCapacityError,
+    PickupDateUnavailableError,
+    PlanBelowCommitmentsError,
+    StatusTransitionError,
+} from '@/server/domain/errors';
 import { updateDailyPlan } from '@/server/services/production/update-daily-plan';
 import { cancelReservation } from '@/server/services/reservations/cancel-reservation';
 import {
@@ -29,6 +34,8 @@ import {
 const PICKUP_DATE = '2099-07-15'; // Wednesday
 const WEDNESDAY = 3;
 const BEFORE_CUTOFF = pragueTimeToInstant('2099-07-14', 12);
+const CUTOFF = pragueTimeToInstant('2099-07-14', 18);
+const JUST_BEFORE_CUTOFF = new Date(CUTOFF.getTime() - 100);
 
 /**
  * A separate pool for the lock holder and lock-wait polling, so the services under test can
@@ -381,6 +388,102 @@ describe('cancellation concurrent with a new reservation', () => {
 
         await expect(reservation).rejects.toBeInstanceOf(InsufficientCapacityError);
         await expect(cancellation).resolves.toMatchObject({ status: 'cancelled' });
+        expect((await readCommitted([bread.id])).get(bread.id)).toBe(0);
+    });
+});
+
+describe('lock waits that cross the cutoff', () => {
+    // Only `Date` is faked, so the services read the moved clock while timers and the
+    // database driver keep running in real time.
+    const startClockJustBeforeCutoff = () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(JUST_BEFORE_CUTOFF);
+    };
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('rejects a customer cancellation that obtains its locks at the cutoff', async () => {
+        const bread = await insertProduct(5);
+        const created = await createReservation(
+            { ...buildInput([{ productId: bread.id, quantity: 2 }]), source: 'online' },
+            { now: BEFORE_CUTOFF },
+        );
+        startClockJustBeforeCutoff();
+
+        const holder = await holdPlanLocks([bread.id]);
+        let cancellation: Promise<unknown> | undefined;
+        try {
+            cancellation = (
+                await holder.queue(
+                    () => cancelReservation({ actor: 'customer', token: created.managementToken }),
+                    1,
+                )
+            ).result;
+            vi.setSystemTime(CUTOFF);
+        } finally {
+            await holder.release();
+        }
+
+        await expect(cancellation).rejects.toBeInstanceOf(StatusTransitionError);
+        await expect(cancellation).rejects.toMatchObject({ code: 'CUTOFF_PASSED' });
+        expect((await readCommitted([bread.id])).get(bread.id)).toBe(2);
+    });
+
+    it('retains the items when an admin cancellation obtains its locks at the cutoff', async () => {
+        const bread = await insertProduct(5);
+        const created = await reserve([{ productId: bread.id, quantity: 2 }]);
+        startClockJustBeforeCutoff();
+
+        const holder = await holdPlanLocks([bread.id]);
+        let cancellation: Promise<unknown> | undefined;
+        try {
+            cancellation = (
+                await holder.queue(
+                    () =>
+                        cancelReservation({ actor: 'admin', reservationId: created.reservationId }),
+                    1,
+                )
+            ).result;
+            vi.setSystemTime(CUTOFF);
+        } finally {
+            await holder.release();
+        }
+
+        await expect(cancellation).resolves.toMatchObject({ status: 'cancelled' });
+        const [row] = await getDb()
+            .select()
+            .from(reservations)
+            .where(eq(reservations.id, created.reservationId));
+        expect(row).toMatchObject({ retainForProduction: true, cancelledAt: CUTOFF });
+        expect((await readCommitted([bread.id])).get(bread.id)).toBe(2);
+    });
+
+    it('rejects an online reservation that obtains its locks at the cutoff', async () => {
+        const bread = await insertProduct(5);
+        startClockJustBeforeCutoff();
+
+        const holder = await holdPlanLocks([bread.id]);
+        let creation: Promise<unknown> | undefined;
+        try {
+            creation = (
+                await holder.queue(
+                    () =>
+                        createReservation({
+                            ...buildInput([{ productId: bread.id, quantity: 1 }]),
+                            source: 'online',
+                        }),
+                    1,
+                )
+            ).result;
+            vi.setSystemTime(CUTOFF);
+        } finally {
+            await holder.release();
+        }
+
+        await expect(creation).rejects.toBeInstanceOf(PickupDateUnavailableError);
+        await expect(creation).rejects.toMatchObject({ code: 'CUTOFF_PASSED' });
         expect((await readCommitted([bread.id])).get(bread.id)).toBe(0);
     });
 });

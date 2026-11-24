@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { asc, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
     findOnlineQuantityLimitViolation,
     ONLINE_MAX_UNITS_PER_PRODUCT,
@@ -63,21 +63,25 @@ export type CreateReservationResult = {
 const IDEMPOTENCY_KEY_CONSTRAINT = 'reservations_idempotency_key_unique';
 const MAX_ATTEMPTS = 3;
 
-const parseInput = (
-    input: CreateReservationInput,
-): { request: ReservationRequest; source: ReservationSource } => {
-    if (!reservationSources.includes(input.source)) {
-        throw new Error(`Invalid reservation source: ${String(input.source)}`);
-    }
-    const parsed = reservationRequestSchema.safeParse(input);
+/** Unknown fields, including a client-supplied `source`, are stripped. */
+const parseRequest = (body: unknown): ReservationRequest => {
+    const parsed = reservationRequestSchema.safeParse(body);
     if (!parsed.success) {
         throw new InvalidRequestError(
             toValidationIssues(parsed.error),
             'The reservation request is invalid.',
         );
     }
-    return { request: parsed.data, source: input.source };
+    return parsed.data;
 };
+
+/** One display order for every response: product name, then ID for equal names. */
+export const compareConfirmationItems = (
+    a: ReservationConfirmationItem,
+    b: ReservationConfirmationItem,
+): number =>
+    a.productName.localeCompare(b.productName, 'cs') ||
+    (a.productId < b.productId ? -1 : a.productId > b.productId ? 1 : 0);
 
 const assertOnlineQuantityLimits = (items: readonly ReservationItemInput[]): void => {
     const violation = findOnlineQuantityLimitViolation(items);
@@ -146,7 +150,7 @@ const buildResult = (
     pickupDate: reservation.pickupDate,
     status: reservation.status,
     totalPrice: items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
-    items,
+    items: [...items].sort(compareConfirmationItems),
     managementToken,
     replayed,
 });
@@ -185,8 +189,7 @@ const findReplay = async (
             quantity: reservationItems.quantity,
         })
         .from(reservationItems)
-        .where(eq(reservationItems.reservationId, existing.id))
-        .orderBy(asc(reservationItems.productId));
+        .where(eq(reservationItems.reservationId, existing.id));
     return buildResult(existing, items, managementToken, true);
 };
 
@@ -195,7 +198,7 @@ const createInTransaction = async (
     request: ReservationRequest,
     source: ReservationSource,
     requestHash: string,
-    now: Date,
+    getNow: () => Date,
 ): Promise<CreateReservationResult> => {
     const replay = await findReplay(tx, request.idempotencyKey, requestHash);
     if (replay) {
@@ -203,7 +206,7 @@ const createInTransaction = async (
     }
 
     // Rejects ineligible dates and products before materializing or locking any plan.
-    await assertPickupDateAvailable(tx, request.pickupDate, source, now);
+    await assertPickupDateAvailable(tx, request.pickupDate, source, getNow());
     const productIds = request.items.map((item) => item.productId);
     await loadOfferedProducts(tx, productIds, request.pickupDate);
     const plans = await lockDailyPlans(tx, request.pickupDate, productIds);
@@ -213,8 +216,9 @@ const createInTransaction = async (
     if (lockedReplay) {
         return lockedReplay;
     }
-    // Re-check after locking so eligibility and the price/name snapshots are current.
-    await assertPickupDateAvailable(tx, request.pickupDate, source, now);
+    // Re-check after locking so eligibility and the price/name snapshots are current, with
+    // the clock read again: the lock wait may cross the cutoff.
+    await assertPickupDateAvailable(tx, request.pickupDate, source, getNow());
     const offered = await loadOfferedProducts(tx, productIds, request.pickupDate);
     const committed = await getCommittedQuantities(tx, request.pickupDate, productIds);
     assertCapacity(request.items, plans, committed);
@@ -254,27 +258,21 @@ const createInTransaction = async (
     return buildResult(reservation, items, managementToken, false);
 };
 
-/**
- * Creates a confirmed reservation for every item or none, following the locking protocol
- * (TDD §6): idempotency check, eligibility, plan locks in product-ID order, then capacity
- * from committed quantities read after locking. The online cutoff and quantity limits apply
- * only to `online`; capacity applies to every source. `now` is injectable for tests.
- */
-export const createReservation = async (
-    input: CreateReservationInput,
-    options: { now?: Date } = {},
+const createValidated = async (
+    request: ReservationRequest,
+    source: ReservationSource,
+    options: { now?: Date },
 ): Promise<CreateReservationResult> => {
-    const { request, source } = parseInput(input);
     if (source === 'online') {
         assertOnlineQuantityLimits(request.items);
     }
-    const now = options.now ?? new Date();
+    const getNow = () => options.now ?? new Date();
     const requestHash = computeRequestHash(request, source);
 
     for (let attempt = 1; ; attempt++) {
         try {
             return await getDb().transaction((tx) =>
-                createInTransaction(tx, request, source, requestHash, now),
+                createInTransaction(tx, request, source, requestHash, getNow),
             );
         } catch (error) {
             // A concurrent request with the same key committed first; the unique constraint is
@@ -292,3 +290,26 @@ export const createReservation = async (
         }
     }
 };
+
+/**
+ * Creates a confirmed reservation for every item or none, following the locking protocol
+ * (TDD §6): idempotency check, eligibility, plan locks in product-ID order, then capacity
+ * from committed quantities read after locking. The online cutoff and quantity limits apply
+ * only to `online`; capacity applies to every source. `now` is injectable for tests and
+ * otherwise read at each check.
+ */
+export const createReservation = async (
+    input: CreateReservationInput,
+    options: { now?: Date } = {},
+): Promise<CreateReservationResult> => {
+    if (!reservationSources.includes(input.source)) {
+        throw new Error(`Invalid reservation source: ${String(input.source)}`);
+    }
+    return createValidated(parseRequest(input), input.source, options);
+};
+
+/** The public API entry point: validates an untrusted body and always uses `online`. */
+export const createOnlineReservation = async (
+    body: unknown,
+    options: { now?: Date } = {},
+): Promise<CreateReservationResult> => createValidated(parseRequest(body), 'online', options);

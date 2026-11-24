@@ -47,9 +47,9 @@ Request body for `POST /api/reservations` (TDD §8); any `source` or price field
 }
 ```
 
-Errors are RFC 9457 Problem Details (`application/problem+json`) with a stable `code`, e.g. `INSUFFICIENT_CAPACITY` (409, with a `shortages` array), `CUTOFF_PASSED` (409), `IDEMPOTENCY_CONFLICT` (409), `RESERVATION_NOT_FOUND` (404), `RATE_LIMITED` (429 with `Retry-After`). Reservation creation is limited to 10 requests per client IP per 10 minutes, counted in the `rate_limits` table.
+Errors are RFC 9457 Problem Details (`application/problem+json`) with a stable `code`, e.g. `INSUFFICIENT_CAPACITY` (409, with a `shortages` array), `CUTOFF_PASSED` (409), `IDEMPOTENCY_CONFLICT` (409), `RESERVATION_NOT_FOUND` (404), `RATE_LIMITED` (429 with `Retry-After`). Reservation creation is limited to 10 requests per client IP per 10 minutes, counted in the `rate_limits` table. On Netlify the client IP comes from `x-nf-client-connection-ip`, which Netlify sets itself. Elsewhere the last `x-forwarded-for` entry is used, which is only trustworthy behind exactly one proxy that appends it. Requests with neither header share a single `unknown` bucket.
 
-Management links (`/reservations/manage/:token`) are bearer credentials. The application never logs them and all reservation responses are sent with `Cache-Control: no-store`, but the token is part of the URL path, so request logs outside the application (the Next.js dev server, hosting access logs) can contain it.
+Management links (`/reservations/manage/:token`) are built from `APP_URL` when it is set, otherwise from the request's origin. They are bearer credentials. The application never logs them and all reservation responses are sent with `Cache-Control: no-store`, but the token is part of the URL path, so request logs outside the application (the Next.js dev server, hosting access logs) can contain it.
 
 ## Scripts
 
@@ -71,7 +71,7 @@ Management links (`/reservations/manage/:token`) are bearer credentials. The app
 
 - The GitHub repository is linked to Netlify: pushing to `main` deploys production; pull requests get Deploy Previews.
 - **Deploy only through Git.** Do not run `netlify deploy` from a local machine: it bundles local `.env*` files into the function and the host's native binary of `@node-rs/argon2`, which fails on Netlify's Linux runtime.
-- Netlify environment variables: `DATABASE_URL` (Neon **pooled** connection string), `DATABASE_URL_UNPOOLED` (direct connection, used for migrations), `MANAGEMENT_TOKEN_SECRET` (min. 32 characters; keep it stable across deploys, because changing it invalidates every existing management link), `NODE_VERSION=24`.
+- Netlify environment variables: `DATABASE_URL` (Neon **pooled** connection string), `DATABASE_URL_UNPOOLED` (direct connection, used for migrations), `MANAGEMENT_TOKEN_SECRET` (min. 32 characters; keep it stable across deploys, because changing it invalidates every existing management link), `APP_URL=https://bakeryos-311.netlify.app` (all contexts: Deploy Previews share the production database, so their management links must also point at production), `NODE_VERSION=24`.
 
 ### Migrations
 

@@ -55,10 +55,10 @@ const findBookableDate = async (): Promise<string> => {
     throw new Error('No open day in the online booking window; seed the schedule first.');
 };
 
-const insertProduct = async (defaultCapacity = 5) => {
+const insertProduct = async (defaultCapacity = 5, name = 'API test loaf') => {
     const [product] = await getDb()
         .insert(products)
-        .values({ name: 'API test loaf', price: 3900, defaultCapacity })
+        .values({ name, price: 3900, defaultCapacity })
         .returning();
     createdProductIds.push(product.id);
     return product;
@@ -129,6 +129,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+    vi.unstubAllEnvs();
     await closeDb();
 });
 
@@ -201,6 +202,46 @@ describe('POST /api/reservations', () => {
         expect(await replayed.json()).toEqual(confirmation);
     });
 
+    it('lists items in the same order on creation, replay, and the management endpoint', async () => {
+        // Name order is chosen to differ from ID order whichever IDs are generated.
+        const [first, second] = [
+            await insertProduct(5, 'API test A'),
+            await insertProduct(5, 'API test B'),
+        ];
+        const [high, low] = first.id > second.id ? [first, second] : [second, first];
+        await getDb().update(products).set({ name: 'API test A' }).where(eq(products.id, high.id));
+        await getDb().update(products).set({ name: 'API test B' }).where(eq(products.id, low.id));
+        const body = {
+            ...reservationBody(low.id, 1),
+            items: [
+                { productId: low.id, quantity: 1 },
+                { productId: high.id, quantity: 1 },
+            ],
+        };
+
+        const created = await (await postJson(body)).json();
+        const replayed = await (await postJson(body)).json();
+        const managed = await (await getManaged(tokenFromUrl(created.managementUrl))).json();
+
+        const names = (items: { productName: string }[]) => items.map((item) => item.productName);
+        expect(names(created.items)).toEqual(['API test A', 'API test B']);
+        expect(replayed.items).toEqual(created.items);
+        expect(managed.items).toEqual(created.items);
+    });
+
+    it('builds the management URL from APP_URL when it is set', async () => {
+        vi.stubEnv('APP_URL', 'https://bakery.example/');
+        const product = await insertProduct();
+
+        const response = await postJson(reservationBody(product.id));
+        vi.unstubAllEnvs();
+
+        const { managementUrl } = await response.json();
+        expect(managementUrl).toMatch(
+            /^https:\/\/bakery\.example\/reservations\/manage\/[A-Za-z0-9_-]{43}$/,
+        );
+    });
+
     it('always stores public reservations as online, ignoring a client-supplied source', async () => {
         const product = await insertProduct();
 
@@ -262,6 +303,7 @@ describe('POST /api/reservations', () => {
 
     it.each([
         ['malformed JSON', '{"idempotencyKey":'],
+        ['a JSON body that is not an object', '[1, 2]'],
         ['an invalid phone number', { phone: '12' }],
     ])('returns 400 for %s', async (_label, payload) => {
         const product = await insertProduct();

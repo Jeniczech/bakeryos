@@ -1,5 +1,3 @@
-import { reservationRequestSchema } from '@/lib/validation/reservation';
-import { InvalidRequestError, toValidationIssues } from '@/server/domain/errors';
 import { getClientIp } from '@/server/http/client-ip';
 import {
     errorResponse,
@@ -7,9 +5,10 @@ import {
     problemResponse,
     readJsonBody,
 } from '@/server/http/problem-details';
+import { getPublicOrigin } from '@/server/http/public-origin';
 import { toConfirmationBody } from '@/server/http/reservation-responses';
 import { consumeRateLimit, RESERVATION_RATE_LIMIT } from '@/server/services/rate-limit';
-import { createReservation } from '@/server/services/reservations/create-reservation';
+import { createOnlineReservation } from '@/server/services/reservations/create-reservation';
 
 export const POST = async (request: Request): Promise<Response> => {
     try {
@@ -30,16 +29,8 @@ export const POST = async (request: Request): Promise<Response> => {
             );
         }
 
-        // Unknown fields such as a client-supplied `source` are stripped here.
-        const parsed = reservationRequestSchema.safeParse(await readJsonBody(request));
-        if (!parsed.success) {
-            throw new InvalidRequestError(
-                toValidationIssues(parsed.error),
-                'The reservation request is invalid.',
-            );
-        }
-        const result = await createReservation({ ...parsed.data, source: 'online' });
-        return Response.json(toConfirmationBody(result, new URL(request.url).origin), {
+        const result = await createOnlineReservation(await readJsonBody(request));
+        return Response.json(toConfirmationBody(result, getPublicOrigin(request)), {
             status: result.replayed ? 200 : 201,
             headers: NO_STORE_HEADERS,
         });
