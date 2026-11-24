@@ -11,7 +11,6 @@ import {
     checkPickupDate,
     checkProductOffered,
     getBookingWindow,
-    isBakeryOpen,
     listPickupDates,
     type BakerySchedule,
     type PickupDateOption,
@@ -69,10 +68,6 @@ export const assertPickupDateAvailable = async (
         throw new PickupDateUnavailableError(dateCheck.reason);
     }
 };
-
-/** Opening days and closures only; the booking window and cutoff depend on the current time. */
-export const isBakeryOpenOn = async (db: DbExecutor, date: string): Promise<boolean> =>
-    isBakeryOpen(date, await loadSchedule(db, date));
 
 /** The source's booking window, with the reason each unavailable date cannot be booked. */
 export const getPickupDates = async (
