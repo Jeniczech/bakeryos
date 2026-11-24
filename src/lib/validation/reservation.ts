@@ -4,6 +4,7 @@ import { isValidCalendarDate } from '@/lib/date-time/prague';
 export const ONLINE_MAX_UNITS_PER_PRODUCT = 20;
 export const ONLINE_MAX_UNITS_PER_RESERVATION = 50;
 export const CUSTOMER_NAME_MAX_LENGTH = 100;
+export const MAX_ITEMS_PER_REQUEST = 100;
 
 const PHONE_PATTERN = /^\+?\d{9,15}$/;
 
@@ -64,16 +65,23 @@ export const findOnlineQuantityLimitViolation = (
     return null;
 };
 
+/** Lowercased so merging, sorting, and request hashing match PostgreSQL uuid equality and order. */
+const uuidSchema = z.uuid().transform((value) => value.toLowerCase());
+
 const itemSchema = z.object({
-    productId: z.uuid(),
+    productId: uuidSchema,
     quantity: z.int().positive(),
 });
 
 export const reservationRequestSchema = z.object({
-    idempotencyKey: z.uuid(),
+    idempotencyKey: uuidSchema,
     pickupDate: calendarDateSchema,
     customer: z.object({ name: customerNameSchema, phone: phoneSchema }),
-    items: z.array(itemSchema).min(1, 'Add at least one product.').transform(normalizeItems),
+    items: z
+        .array(itemSchema)
+        .min(1, 'Add at least one product.')
+        .max(MAX_ITEMS_PER_REQUEST, `Add at most ${MAX_ITEMS_PER_REQUEST} items.`)
+        .transform(normalizeItems),
 });
 
 export type ReservationRequest = z.output<typeof reservationRequestSchema>;

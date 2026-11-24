@@ -86,7 +86,7 @@ const PRODUCTS: SeedProduct[] = [
         price: 3500,
         defaultCapacity: 40,
         defaultWalkInQuantity: 15,
-        weekdays: [5, 6, 0],
+        weekdays: [6, 0],
     },
     {
         name: 'Braided vánočka',
@@ -107,7 +107,8 @@ const requireEnv = (name: string): string => {
 };
 
 const seed = async (): Promise<void> => {
-    const connectionString = process.env.DATABASE_URL_UNPOOLED || requireEnv('DATABASE_URL');
+    const connectionString =
+        process.env.DATABASE_URL_UNPOOLED?.trim() || requireEnv('DATABASE_URL');
     const adminEmail = requireEnv('ADMIN_SEED_EMAIL').toLowerCase();
     const adminPassword = process.env.ADMIN_SEED_PASSWORD ?? '';
     if (adminPassword.length < MIN_ADMIN_PASSWORD_LENGTH) {
