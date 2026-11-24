@@ -68,7 +68,8 @@ The installed Next.js version may differ from your training data. Before writing
 3. Summarize what was implemented.
 4. List any deviations from the specification.
 5. Report test results and remaining risks.
-6. Wait for approval before proceeding.
+6. Mark completed tasks as checked (`- [x]`) in `docs/IMPLEMENTATION_PLAN.md`.
+7. Wait for approval before proceeding.
 
 Never claim a test passed unless it was actually executed successfully.
 
