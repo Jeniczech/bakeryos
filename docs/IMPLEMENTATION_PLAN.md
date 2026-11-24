@@ -88,8 +88,8 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Apply cutoff only to online source; never bypass capacity.
 - [x] Implement idempotency key, canonical request hash, and unique-conflict replay handling.
 - [x] Implement deterministic HMAC management token derivation and stored token hash.
-- [ ] Implement `updateDailyPlan()` with the same locking protocol.
-- [ ] Add core PostgreSQL integration tests for concurrency and idempotency.
+- [x] Implement `updateDailyPlan()` with the same locking protocol.
+- [x] Add core PostgreSQL integration tests for concurrency and idempotency.
 
 ### Acceptance criteria
 

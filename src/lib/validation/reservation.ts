@@ -66,7 +66,7 @@ export const findOnlineQuantityLimitViolation = (
 };
 
 /** Lowercased so merging, sorting, and request hashing match PostgreSQL uuid equality and order. */
-const uuidSchema = z.uuid().transform((value) => value.toLowerCase());
+export const uuidSchema = z.uuid().transform((value) => value.toLowerCase());
 
 const itemSchema = z.object({
     productId: uuidSchema,

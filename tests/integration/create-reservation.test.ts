@@ -502,9 +502,7 @@ describe('createReservation', () => {
             for (const result of results) {
                 expect(result).toEqual({ ...created[0], replayed: result.replayed });
             }
-            expect(await readReservations([bread.id])).toEqual([
-                { id: created[0].reservationId },
-            ]);
+            expect(await readReservations([bread.id])).toEqual([{ id: created[0].reservationId }]);
         });
 
         it('reports a conflict rather than no capacity for a concurrent same-key payload', async () => {
