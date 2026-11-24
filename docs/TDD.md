@@ -310,15 +310,15 @@ Authenticated admin only. Allow `confirmed → picked_up` and `confirmed → no_
 
 ### 6.6 `updateDailyPlan(input)`
 
-Authenticated admin only. Materialize and lock the plan; aggregate committed quantities; reject if:
+Authenticated admin only. Check eligibility (date and product, as for admin reservations); materialize and lock the plan; re-check eligibility after locking; aggregate committed quantities; reject if:
 
 ```text
 newCapacity < newWalkInQuantity + committedQuantity
 ```
 
-Then update the plan and commit. Admin may do this after cutoff and for today, but cannot violate commitments. Plans for past dates (before today in `Europe/Prague`) cannot be changed, because they are production history.
+Then update the plan and commit. Admin may do this after cutoff and for today, but cannot violate commitments. Plans for past dates (before today in `Europe/Prague`) cannot be changed, because they are production history. The date must also be within the admin booking window (today through today + 7) and a bakery-open date, and the product must be active and offered on that weekday, so no plan is materialized for an ineligible product/date. The past-date check is repeated after locking, because the lock wait may cross midnight.
 
-Returns the updated `DailyProductionItem`. Rejections use typed domain errors: `INVALID_REQUEST` (Zod validation, walk-in above capacity, or a past date), `PRODUCT_NOT_FOUND`, and `PLAN_BELOW_COMMITMENTS` (with the committed quantity).
+Returns the updated `DailyProductionItem`. Rejections use typed domain errors: `INVALID_REQUEST` (Zod validation, walk-in above capacity, or a past date), `OUTSIDE_BOOKING_WINDOW` and `BAKERY_CLOSED` (pickup-date errors), `PRODUCT_NOT_FOUND`, `PRODUCT_UNAVAILABLE` (inactive or not offered on that weekday), and `PLAN_BELOW_COMMITMENTS` (with the committed quantity).
 
 ## 7. Application services and project layout
 

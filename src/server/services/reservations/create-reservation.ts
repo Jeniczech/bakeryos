@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { asc, eq, inArray } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import {
     findOnlineQuantityLimitViolation,
     ONLINE_MAX_UNITS_PER_PRODUCT,
@@ -12,15 +12,7 @@ import { getDb, type DbExecutor, type Transaction } from '@/server/db/client';
 import { getCommittedQuantities } from '@/server/db/committed-quantities';
 import { isTransientConflict, isUniqueViolation } from '@/server/db/errors';
 import { lockDailyPlans, type DailyPlan } from '@/server/db/lock-daily-plans';
-import {
-    bakeryClosures,
-    bakeryOpeningDays,
-    productWeekdays,
-    products,
-    reservationItems,
-    reservations,
-    reservationSources,
-} from '@/server/db/schema';
+import { reservationItems, reservations, reservationSources } from '@/server/db/schema';
 import {
     canReserve,
     getRemainingAvailability,
@@ -29,20 +21,13 @@ import {
 import {
     IdempotencyConflictError,
     InsufficientCapacityError,
-    InvalidReservationRequestError,
+    InvalidRequestError,
     OnlineQuantityLimitError,
-    PickupDateUnavailableError,
-    ProductUnavailableError,
+    toValidationIssues,
     type CapacityShortage,
-    type UnavailableProduct,
 } from '@/server/domain/errors';
-import {
-    checkPickupDate,
-    checkProductOffered,
-    type BakerySchedule,
-    type ReservationSource,
-    type ReservationStatus,
-} from '@/server/domain/reservation-rules';
+import type { ReservationSource, ReservationStatus } from '@/server/domain/reservation-rules';
+import { assertPickupDateAvailable, loadOfferedProducts } from '../eligibility';
 import { deriveManagementToken, hashManagementToken } from './management-token';
 import { computeRequestHash } from './request-hash';
 
@@ -78,8 +63,6 @@ export type CreateReservationResult = {
 const IDEMPOTENCY_KEY_CONSTRAINT = 'reservations_idempotency_key_unique';
 const MAX_ATTEMPTS = 3;
 
-type OfferedProduct = { id: string; name: string; price: number };
-
 const parseInput = (
     input: CreateReservationInput,
 ): { request: ReservationRequest; source: ReservationSource } => {
@@ -88,11 +71,9 @@ const parseInput = (
     }
     const parsed = reservationRequestSchema.safeParse(input);
     if (!parsed.success) {
-        throw new InvalidReservationRequestError(
-            parsed.error.issues.map((issue) => ({
-                path: issue.path.join('.'),
-                message: issue.message,
-            })),
+        throw new InvalidRequestError(
+            toValidationIssues(parsed.error),
+            'The reservation request is invalid.',
         );
     }
     return { request: parsed.data, source: input.source };
@@ -115,70 +96,6 @@ const assertOnlineQuantityLimits = (items: readonly ReservationItemInput[]): voi
             violation.quantity,
         );
     }
-};
-
-const loadSchedule = async (tx: Transaction, pickupDate: string): Promise<BakerySchedule> => {
-    const openDays = await tx
-        .select({ weekday: bakeryOpeningDays.weekday })
-        .from(bakeryOpeningDays)
-        .where(eq(bakeryOpeningDays.isOpen, true));
-    const closures = await tx
-        .select({ date: bakeryClosures.date })
-        .from(bakeryClosures)
-        .where(eq(bakeryClosures.date, pickupDate));
-    return {
-        openWeekdays: new Set(openDays.map((day) => day.weekday)),
-        closures: new Set(closures.map((closure) => closure.date)),
-    };
-};
-
-/** Returns the products in the order of `productIds`, or rejects every unavailable one at once. */
-const loadOfferedProducts = async (
-    tx: Transaction,
-    productIds: readonly string[],
-    pickupDate: string,
-): Promise<OfferedProduct[]> => {
-    const rows = await tx
-        .select({
-            id: products.id,
-            name: products.name,
-            price: products.price,
-            active: products.active,
-        })
-        .from(products)
-        .where(inArray(products.id, [...productIds]));
-    const weekdayRows = await tx
-        .select({ productId: productWeekdays.productId, weekday: productWeekdays.weekday })
-        .from(productWeekdays)
-        .where(inArray(productWeekdays.productId, [...productIds]));
-
-    const rowsById = new Map(rows.map((row) => [row.id, row]));
-    const weekdaysByProduct = new Map<string, number[]>();
-    for (const { productId, weekday } of weekdayRows) {
-        const weekdays = weekdaysByProduct.get(productId) ?? [];
-        weekdays.push(weekday);
-        weekdaysByProduct.set(productId, weekdays);
-    }
-    const offered: OfferedProduct[] = [];
-    const unavailable: UnavailableProduct[] = [];
-    for (const productId of productIds) {
-        const row = rowsById.get(productId);
-        if (!row) {
-            unavailable.push({ productId, reason: 'PRODUCT_NOT_FOUND' });
-            continue;
-        }
-        const weekdays = weekdaysByProduct.get(productId) ?? [];
-        const check = checkProductOffered({ active: row.active, weekdays }, pickupDate);
-        if (check.ok) {
-            offered.push({ id: row.id, name: row.name, price: row.price });
-        } else {
-            unavailable.push({ productId, reason: check.reason });
-        }
-    }
-    if (unavailable.length > 0) {
-        throw new ProductUnavailableError(unavailable);
-    }
-    return offered;
 };
 
 /** Checks the whole cart, so one rejection lists every short product. */
@@ -271,19 +188,6 @@ const findReplay = async (
         .where(eq(reservationItems.reservationId, existing.id))
         .orderBy(asc(reservationItems.productId));
     return buildResult(existing, items, managementToken, true);
-};
-
-const assertPickupDateAvailable = async (
-    tx: Transaction,
-    pickupDate: string,
-    source: ReservationSource,
-    now: Date,
-): Promise<void> => {
-    const schedule = await loadSchedule(tx, pickupDate);
-    const dateCheck = checkPickupDate({ pickupDate, source, now, schedule });
-    if (!dateCheck.ok) {
-        throw new PickupDateUnavailableError(dateCheck.reason);
-    }
 };
 
 const createInTransaction = async (

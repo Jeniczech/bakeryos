@@ -4,14 +4,21 @@ import { dailyPlanUpdateSchema, type DailyPlanUpdate } from '@/lib/validation/da
 import { getDb, type Transaction } from '@/server/db/client';
 import { getCommittedQuantities } from '@/server/db/committed-quantities';
 import { lockDailyPlans, MissingDailyPlanError } from '@/server/db/lock-daily-plans';
-import { dailyProductPlans, products } from '@/server/db/schema';
+import { dailyProductPlans } from '@/server/db/schema';
 import { canUpdatePlan, getCommittedQuantity } from '@/server/domain/availability';
 import {
-    InvalidDailyPlanUpdateError,
+    InvalidRequestError,
     PlanBelowCommitmentsError,
     ProductNotFoundError,
+    ProductUnavailableError,
+    toValidationIssues,
 } from '@/server/domain/errors';
 import { buildDailyProductionItem, type DailyProductionItem } from '@/server/domain/production';
+import {
+    assertPickupDateAvailable,
+    loadOfferedProducts,
+    type OfferedProduct,
+} from '../eligibility';
 
 export type UpdateDailyPlanInput = {
     productId: string;
@@ -20,40 +27,61 @@ export type UpdateDailyPlanInput = {
     walkInQuantity: number;
 };
 
-const parseInput = (input: UpdateDailyPlanInput, now: Date): DailyPlanUpdate => {
+const parseInput = (input: UpdateDailyPlanInput): DailyPlanUpdate => {
     const parsed = dailyPlanUpdateSchema.safeParse(input);
     if (!parsed.success) {
-        throw new InvalidDailyPlanUpdateError(
-            parsed.error.issues.map((issue) => ({
-                path: issue.path.join('.'),
-                message: issue.message,
-            })),
+        throw new InvalidRequestError(
+            toValidationIssues(parsed.error),
+            'The daily plan update is invalid.',
         );
     }
-    // Past plans are production history; editing them would rewrite what was planned.
-    if (parsed.data.date < getPragueDate(now)) {
-        throw new InvalidDailyPlanUpdateError([
-            { path: 'date', message: 'Plans for past dates cannot be changed.' },
-        ]);
-    }
     return parsed.data;
+};
+
+/**
+ * Past plans are production history; editing them would rewrite what was planned. Beyond
+ * that, the date must be in the admin booking window and open, and the product offered.
+ */
+const assertPlanEditable = async (
+    tx: Transaction,
+    update: DailyPlanUpdate,
+    now: Date,
+): Promise<OfferedProduct> => {
+    if (update.date < getPragueDate(now)) {
+        throw new InvalidRequestError(
+            [{ path: 'date', message: 'Plans for past dates cannot be changed.' }],
+            'The daily plan update is invalid.',
+        );
+    }
+    await assertPickupDateAvailable(tx, update.date, 'admin', now);
+    try {
+        const [product] = await loadOfferedProducts(tx, [update.productId], update.date);
+        return product;
+    } catch (error) {
+        if (
+            error instanceof ProductUnavailableError &&
+            error.products.some((product) => product.reason === 'PRODUCT_NOT_FOUND')
+        ) {
+            throw new ProductNotFoundError(update.productId);
+        }
+        throw error;
+    }
 };
 
 const updateInTransaction = async (
     tx: Transaction,
     update: DailyPlanUpdate,
+    getNow: () => Date,
 ): Promise<DailyProductionItem> => {
+    // Rejects ineligible products/dates before materializing a plan, then again after the
+    // lock, which may have been waited on past midnight or a concurrent closure/deactivation.
+    await assertPlanEditable(tx, update, getNow());
     const [plan] = await lockDailyPlans(tx, update.date, [update.productId]);
-    const [product] = await tx
-        .select({ name: products.name })
-        .from(products)
-        .where(eq(products.id, update.productId));
+    const product = await assertPlanEditable(tx, update, getNow());
+    // Keyed by the lowercase ID; the schema lowercases `productId`, so the entry always exists.
     const committed = (await getCommittedQuantities(tx, update.date, [update.productId])).get(
         update.productId,
-    );
-    if (!committed) {
-        throw new Error(`Missing commitments for product ${update.productId}`);
-    }
+    )!;
     if (!canUpdatePlan(committed, update)) {
         throw new PlanBelowCommitmentsError(update.productId, getCommittedQuantity(committed));
     }
@@ -64,25 +92,27 @@ const updateInTransaction = async (
         .where(eq(dailyProductPlans.id, plan.id));
 
     return buildDailyProductionItem(
-        { productId: update.productId, productName: product.name },
+        { productId: product.id, productName: product.name },
         { capacity: update.capacity, walkInQuantity: update.walkInQuantity, ...committed },
     );
 };
 
 /**
  * Overrides one product/date's capacity and walk-in quantity under the shared locking
- * protocol (TDD §6.6): materialize and lock the plan, read committed quantities after the
- * lock, and reject any plan that would no longer cover walk-ins plus commitments. Allowed
- * after the online cutoff and for today, never for past dates. Callers must authorize the
- * administrator; `now` is injectable for tests.
+ * protocol (TDD §6.6): check eligibility, materialize and lock the plan, re-check
+ * eligibility and read committed quantities after the lock, and reject any plan that would
+ * no longer cover walk-ins plus commitments. Allowed after the online cutoff and for today,
+ * never for past dates or outside the admin booking window. Callers must authorize the
+ * administrator; `now` is injectable for tests and otherwise read at each check.
  */
 export const updateDailyPlan = async (
     input: UpdateDailyPlanInput,
     options: { now?: Date } = {},
 ): Promise<DailyProductionItem> => {
-    const update = parseInput(input, options.now ?? new Date());
+    const update = parseInput(input);
+    const getNow = () => options.now ?? new Date();
     try {
-        return await getDb().transaction((tx) => updateInTransaction(tx, update));
+        return await getDb().transaction((tx) => updateInTransaction(tx, update, getNow));
     } catch (error) {
         if (error instanceof MissingDailyPlanError) {
             throw new ProductNotFoundError(update.productId);
