@@ -10,6 +10,9 @@ export type RateLimitResult = { allowed: true } | { allowed: false; retryAfterSe
 /** TDD §11: 10 reservation requests per IP per 10 minutes; replays count too. */
 export const RESERVATION_RATE_LIMIT: RateLimitPolicy = { limit: 10, windowMs: 10 * 60_000 };
 
+/** TDD §11: 5 login attempts per IP and email per 15 minutes; successful ones count too. */
+export const LOGIN_RATE_LIMIT: RateLimitPolicy = { limit: 5, windowMs: 15 * 60_000 };
+
 // Longer than any policy window, so cleanup never deletes a window that is still counting.
 const EXPIRED_WINDOW_AGE_MS = 24 * 60 * 60_000;
 

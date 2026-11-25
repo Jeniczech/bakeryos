@@ -489,6 +489,8 @@ Routes:
 
 Use Auth.js Credentials with Argon2id, a seeded admin user, and secure HttpOnly JWT session cookies. Target eight-hour session lifetime. No public registration or password reset. Check authorization **inside every admin Server Action and server-side read**, not only in layout or middleware.
 
+Sign-in and sign-out run only through Server Actions, which call Auth.js directly, so the `/api/auth/*` route handlers are deliberately not mounted.
+
 Admin functions:
 
 - Reservations by pickup date; manual phone reservation; mark picked up, cancelled, or no-show.
