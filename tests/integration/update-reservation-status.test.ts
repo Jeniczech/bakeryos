@@ -221,7 +221,7 @@ describe('getDailyReservations', () => {
         expect(first.reservationNumber < second.reservationNumber).toBe(true);
     });
 
-    it('offers only cancellation before the pickup date and nothing after it', async () => {
+    it('offers only cancellation before the pickup date and only outcomes after it', async () => {
         const product = await insertProduct();
         const created = await reserve([{ productId: product.id, quantity: 1 }]);
         const find = async (now: Date) =>
@@ -230,7 +230,10 @@ describe('getDailyReservations', () => {
             );
 
         expect((await find(BEFORE_CUTOFF))?.allowedStatusTargets).toEqual(['cancelled']);
-        expect((await find(DAY_AFTER_PICKUP))?.allowedStatusTargets).toEqual([]);
+        expect((await find(DAY_AFTER_PICKUP))?.allowedStatusTargets).toEqual([
+            'picked_up',
+            'no_show',
+        ]);
     });
 
     it('rejects an invalid date', async () => {
@@ -274,16 +277,10 @@ describe('updateReservationStatus', () => {
         expect((await readReservation(created.reservationId)).status).toBe('confirmed');
     });
 
-    it('rejects changes once the pickup date has passed', async () => {
+    it('records a no-show after the pickup date but rejects a cancellation', async () => {
         const product = await insertProduct();
         const created = await reserve([{ productId: product.id, quantity: 1 }]);
 
-        await expect(
-            updateReservationStatus(
-                { reservationId: created.reservationId, status: 'no_show' },
-                { now: DAY_AFTER_PICKUP },
-            ),
-        ).rejects.toMatchObject({ code: 'PICKUP_DATE_PASSED' });
         await expect(
             cancelReservation(
                 { actor: 'admin', reservationId: created.reservationId },
@@ -291,6 +288,12 @@ describe('updateReservationStatus', () => {
             ),
         ).rejects.toMatchObject({ code: 'PICKUP_DATE_PASSED' });
         expect((await readReservation(created.reservationId)).status).toBe('confirmed');
+
+        await updateReservationStatus(
+            { reservationId: created.reservationId, status: 'no_show' },
+            { now: DAY_AFTER_PICKUP },
+        );
+        expect((await readReservation(created.reservationId)).status).toBe('no_show');
     });
 
     it('rejects changing a terminal status', async () => {

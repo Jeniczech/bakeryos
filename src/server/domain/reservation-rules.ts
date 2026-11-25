@@ -116,8 +116,9 @@ export type StatusTransitionResult =
 /**
  * Only `confirmed` reservations can change status. Customers may only cancel, strictly before
  * the cutoff. Admin cancellation at or after the cutoff retains the production commitment.
- * Pickup outcomes are admin-only and allowed only on the pickup date itself. Past pickup
- * dates are history, so an admin cannot change their reservations either.
+ * Pickup outcomes are admin-only and allowed from the pickup date onwards, so a no-show can
+ * be recorded the next morning. An admin cannot cancel once the pickup date has passed: it
+ * would be late anyway and change nothing for production.
  */
 export const checkStatusTransition = (input: {
     from: ReservationStatus;
@@ -131,10 +132,10 @@ export const checkStatusTransition = (input: {
         return { ok: false, reason: 'INVALID_TRANSITION' };
     }
     const today = getPragueDate(now);
-    if (actor === 'admin' && pickupDate < today) {
-        return { ok: false, reason: 'PICKUP_DATE_PASSED' };
-    }
     if (to === 'cancelled') {
+        if (actor === 'admin' && pickupDate < today) {
+            return { ok: false, reason: 'PICKUP_DATE_PASSED' };
+        }
         const isLate = !isBeforeOnlineCutoff(pickupDate, now);
         if (actor === 'customer' && isLate) {
             return { ok: false, reason: 'CUTOFF_PASSED' };

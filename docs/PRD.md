@@ -93,6 +93,7 @@ Payment occurs at pickup. There are no customer accounts, emails, or SMS notific
 - Mark a confirmed reservation as `picked_up`, `cancelled`, or `no_show`.
 - No editing existing reservations: cancel and recreate instead.
 - `picked_up` and `no_show` are only available on or after pickup date.
+- Cancellation is not available once the pickup date has passed.
 - Terminal statuses cannot be changed in the MVP.
 
 ### 5.4 Production planning

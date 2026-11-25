@@ -7,7 +7,7 @@ import { Notice } from '@/components/ui/notice';
 import { addDays, getPragueDate, isValidCalendarDate } from '@/lib/date-time/prague';
 import { formatLongDate } from '@/lib/formatting/dates';
 import { requireAdmin } from '@/server/auth/require-admin';
-import { isBeforeOnlineCutoff } from '@/server/domain/reservation-rules';
+import { getOnlineCutoff } from '@/server/domain/reservation-rules';
 import { getDailyReservations } from '@/server/services/reservations/get-daily-reservations';
 
 type SearchParams = PageProps<'/admin/reservations'>['searchParams'];
@@ -66,14 +66,17 @@ const ReservationsContent = async ({ searchParams }: { searchParams: SearchParam
                 {date === today && ' (dnes)'}
             </h2>
             {date < today && (
-                <Notice>Datum vyzvednutí už proběhlo, rezervace lze jen prohlížet.</Notice>
+                <Notice>
+                    Datum vyzvednutí už proběhlo: rezervace lze ještě označit jako vyzvednuté nebo
+                    nevyzvednuté, ale ne zrušit.
+                </Notice>
             )}
             {reservations.length === 0 ? (
                 <Notice>Na tento den nejsou žádné rezervace.</Notice>
             ) : (
                 <ReservationList
                     reservations={reservations}
-                    cancellationRetainsProduction={!isBeforeOnlineCutoff(date, now)}
+                    cancellationCutoff={getOnlineCutoff(date).toISOString()}
                 />
             )}
         </div>

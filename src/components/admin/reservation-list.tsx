@@ -24,10 +24,11 @@ const SOURCE_LABELS: Record<ReservationSource, string> = {
 
 export const ReservationList = ({
     reservations,
-    cancellationRetainsProduction,
+    cancellationCutoff,
 }: {
     reservations: readonly DailyReservation[];
-    cancellationRetainsProduction: boolean;
+    /** ISO instant; the date's online cutoff. */
+    cancellationCutoff: string;
 }) => (
     <div className="overflow-x-auto rounded-xl border border-amber-200 bg-white shadow-sm">
         <table className="w-full text-left text-sm">
@@ -104,7 +105,7 @@ export const ReservationList = ({
                                 reservationId={reservation.reservationId}
                                 reservationNumber={reservation.reservationNumber}
                                 allowedTargets={reservation.allowedStatusTargets}
-                                cancellationRetainsProduction={cancellationRetainsProduction}
+                                cancellationCutoff={cancellationCutoff}
                             />
                         </td>
                     </tr>

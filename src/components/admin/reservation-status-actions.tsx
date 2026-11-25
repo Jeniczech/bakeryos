@@ -13,7 +13,7 @@ const ERROR_MESSAGES: Record<StatusChangeError, string> = {
     FORBIDDEN: 'Tuto změnu nelze provést.',
     CUTOFF_PASSED: 'Termín pro zrušení už uplynul.',
     BEFORE_PICKUP_DATE: 'Vyzvednutí lze označit až v den vyzvednutí.',
-    PICKUP_DATE_PASSED: 'Rezervace s minulým datem vyzvednutí už nelze měnit.',
+    PICKUP_DATE_PASSED: 'Rezervace s minulým datem vyzvednutí už nelze zrušit.',
     NOT_FOUND: 'Rezervace nebyla nalezena.',
     INVALID_REQUEST: 'Neplatný požadavek.',
     UNAVAILABLE: 'Změnu se nepodařilo uložit. Zkuste to prosím znovu.',
@@ -29,18 +29,23 @@ export const ReservationStatusActions = ({
     reservationId,
     reservationNumber,
     allowedTargets,
-    cancellationRetainsProduction,
+    cancellationCutoff,
 }: {
     reservationId: string;
     reservationNumber: string;
     allowedTargets: readonly AdminStatusTarget[];
-    /** Whether a cancellation now is late, so the items stay in production. */
-    cancellationRetainsProduction: boolean;
+    /**
+     * ISO instant after which a cancellation keeps the items in production. Compared at click
+     * time, so a page left open past the cutoff still describes the consequence correctly;
+     * the server decides the actual outcome.
+     */
+    cancellationCutoff: string;
 }) => {
     const [state, formAction, pending] = useActionState(changeReservationStatus, { error: null });
 
     const confirmCancellation = (event: React.MouseEvent<HTMLButtonElement>) => {
-        const consequence = cancellationRetainsProduction
+        const isLate = Date.now() >= new Date(cancellationCutoff).getTime();
+        const consequence = isLate
             ? 'Po uzávěrce zůstanou položky započítané ve výrobě.'
             : 'Kapacita se uvolní pro další rezervace.';
         if (!window.confirm(`Opravdu zrušit rezervaci ${reservationNumber}? ${consequence}`)) {
