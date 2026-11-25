@@ -1,7 +1,16 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { createContext, use, useCallback, useMemo, useRef, useState } from 'react';
+import {
+    createContext,
+    startTransition,
+    use,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import {
     describeSubmitFailure,
     parseRetryAfterMinutes,
@@ -39,10 +48,18 @@ const CheckoutContext = createContext<CheckoutContextValue | null>(null);
 export const CheckoutProvider = ({ children }: { children: React.ReactNode }) => {
     const router = useRouter();
     const clearCart = useClearCart();
-    // State updates are not synchronous, so a fast double click is stopped by a ref.
+    // State updates are not synchronous, so a fast double click is stopped by a ref. It is held
+    // until `submitting` drops, so it also covers a success's pending navigation, when the
+    // stored key is already cleared and a second submit would get a new one.
     const inFlight = useRef(false);
     const [submitting, setSubmitting] = useState(false);
     const [failure, setFailure] = useState<SubmitFailure | null>(null);
+
+    useEffect(() => {
+        if (!submitting) {
+            inFlight.current = false;
+        }
+    }, [submitting]);
 
     const submit = useCallback(
         async (payload: ReservationPayload) => {
@@ -52,11 +69,9 @@ export const CheckoutProvider = ({ children }: { children: React.ReactNode }) =>
             inFlight.current = true;
             setSubmitting(true);
             setFailure(null);
-            const attempt = await resolveSubmissionAttempt(readStoredAttempt(), payload, () =>
-                crypto.randomUUID(),
-            );
-            storeAttempt(attempt);
             const fail = (code: string | null, retryAfter: string | null = null) => {
+                inFlight.current = false;
+                setSubmitting(false);
                 const { kind, refreshCatalog } = describeSubmitFailure(code);
                 setFailure({
                     kind,
@@ -68,6 +83,10 @@ export const CheckoutProvider = ({ children }: { children: React.ReactNode }) =>
                 }
             };
             try {
+                const attempt = await resolveSubmissionAttempt(readStoredAttempt(), payload, () =>
+                    crypto.randomUUID(),
+                );
+                storeAttempt(attempt);
                 const response = await fetch('/api/reservations', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -86,15 +105,17 @@ export const CheckoutProvider = ({ children }: { children: React.ReactNode }) =>
                 }
                 storeAttempt(null);
                 storeConfirmation(confirmation.data);
-                // Next may keep this layout mounted for back navigation: leave it empty.
-                clearCart();
-                router.push('/potvrzeni');
+                // One transition with the navigation: the locked cart stays on screen until the
+                // confirmation renders, instead of an empty, editable storefront in between.
+                // Next may keep this layout mounted for back navigation, so it is left empty.
+                startTransition(() => {
+                    clearCart();
+                    setSubmitting(false);
+                    router.push('/potvrzeni');
+                });
             } catch {
                 // A lost response may still have created the reservation; the retry reuses the key.
                 fail(null);
-            } finally {
-                inFlight.current = false;
-                setSubmitting(false);
             }
         },
         [router, clearCart],
