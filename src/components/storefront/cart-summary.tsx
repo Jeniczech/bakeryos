@@ -116,13 +116,12 @@ export const CartSummary = ({ catalog }: { catalog: CartCatalog }) => {
     return (
         <section
             aria-labelledby={headingId}
-            // The sticky sidebar stays within the viewport; long carts scroll their lines.
-            className="flex flex-col gap-4 rounded-xl border border-amber-200 bg-white p-4 shadow-sm lg:max-h-[calc(100dvh-3rem)]"
+            className="flex flex-col gap-4 rounded-xl border border-amber-200 bg-white p-4 shadow-sm"
         >
             <h2 id={headingId} className="text-lg font-semibold text-amber-950">
                 Košík
             </h2>
-            <ul className="flex min-h-0 flex-col divide-y divide-amber-100 overflow-y-auto">
+            <ul className="flex flex-col divide-y divide-amber-100">
                 {review.lines.map((reviewed) => (
                     <CartLineItem
                         key={reviewed.line.productId}
