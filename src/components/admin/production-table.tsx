@@ -41,6 +41,10 @@ const errorMessage = (state: DailyPlanFormState): string | null => {
     }
 };
 
+/** Whether an input's text means a different number than the stored one. */
+const differsFromStored = (value: string, stored: number): boolean =>
+    value.trim() === '' || Number(value) !== stored;
+
 const NOTICE_LABELS: Record<ProductionRowNotice, string> = {
     INACTIVE: 'neaktivní',
     NOT_OFFERED_ON_DATE: 'v tento den mimo nabídku',
@@ -114,17 +118,25 @@ const ProductCell = ({ row }: { row: DailyProductionRow }) => (
  * from the stored plan.
  */
 const EditableRow = ({ row, date }: { row: DailyProductionRow; date: string }) => {
+    // One toast per row, so a newer outcome replaces the previous one.
+    const toastId = `plan-${row.productId}`;
     const [state, formAction, pending] = useActionState(
         async (previous: DailyPlanFormState, formData: FormData) => {
             const next = await updateDailyPlanAction(previous, formData);
             const message = errorMessage(next);
             if (message) {
+                // Stays until dismissed or replaced: the message may hold numbers to compare.
                 toast.error(`${row.productName}: plán neuložen`, {
+                    id: toastId,
                     description: message,
-                    duration: 8000,
+                    duration: Infinity,
                 });
             } else if (next.saved) {
-                toast.success(`${row.productName}: uloženo`);
+                toast.success(`${row.productName}: uloženo`, {
+                    id: toastId,
+                    description: undefined,
+                    duration: undefined,
+                });
             }
             return next;
         },
@@ -145,8 +157,8 @@ const EditableRow = ({ row, date }: { row: DailyProductionRow; date: string }) =
     const setValue = (field: DailyPlanField) => (value: string) =>
         setDraft({ planKey: storedPlanKey, values: { ...values, [field]: value } });
     const changed =
-        values.capacity !== String(row.capacity) ||
-        values.walkInQuantity !== String(row.walkInQuantity);
+        differsFromStored(values.capacity, row.capacity) ||
+        differsFromStored(values.walkInQuantity, row.walkInQuantity);
     return (
         <tr>
             <ProductCell row={row} />

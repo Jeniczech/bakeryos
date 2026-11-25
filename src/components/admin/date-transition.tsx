@@ -30,13 +30,13 @@ export const DateTransitionProvider = ({ children }: { children: React.ReactNode
     return <DateTransitionContext value={{ pending, navigate }}>{children}</DateTransitionContext>;
 };
 
-/** Dims the day's content, and blocks actions on it, while another day loads. */
+/** Dims the day's content, and makes it inert (no clicks, focus, or reading), while another day loads. */
 export const DateTransitionContent = ({ children }: { children: React.ReactNode }) => {
     const { pending } = useDateTransition();
     return (
         <div
-            aria-busy={pending || undefined}
-            className={`flex flex-col gap-4 transition-opacity ${pending ? 'pointer-events-none opacity-50 delay-200' : ''}`}
+            inert={pending}
+            className={`flex flex-col gap-4 transition-opacity ${pending ? 'opacity-50 delay-200' : ''}`}
         >
             {children}
         </div>
