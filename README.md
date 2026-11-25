@@ -27,6 +27,8 @@ Set `AUTH_SECRET` in `.env` (e.g. `openssl rand -base64 32`) before signing in: 
 
 The seed is safe to re-run: it upserts the opening days and administrator (resetting the admin password from `ADMIN_SEED_PASSWORD`, min. 12 characters), adds missing closures, and inserts the demo catalog only when the `products` table is empty.
 
+Products are managed at `/admin/products`. Unchecking **Aktivní** deactivates a product: it disappears from the catalog and cannot be reserved, while existing reservations keep their name and price snapshots. A new product has no weekday restrictions, so it is offered on every open day (the weekday editor is deferred). Changed default capacity and walk-in quantity apply only to dates without a daily plan yet. Saving a product invalidates the storefront's cached catalog immediately.
+
 `GET /api/health` returns `{"status":"ok","database":"ok"}` when the database is reachable, `503` otherwise.
 
 ## Public API
