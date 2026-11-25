@@ -1,8 +1,14 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
+import {
+    DateTransitionContent,
+    DateTransitionProvider,
+    DateTransitionStatus,
+    TransitionLink,
+} from '@/components/admin/date-transition';
 import { ManualReservationForm } from '@/components/admin/manual-reservation-form';
 import { ADMIN_PICKUP_DATE_MESSAGES } from '@/components/admin/pickup-date-messages';
-import { SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
+import { SECONDARY_BUTTON_CLASSES, SELECTED_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
 import { isValidCalendarDate, type CalendarDate } from '@/lib/date-time/prague';
 import { formatLongDate, formatShortDate } from '@/lib/formatting/dates';
@@ -23,7 +29,7 @@ const DatePicker = ({
     dates: readonly PickupDateOption[];
     selected: CalendarDate;
 }) => (
-    <nav aria-label="Datum vyzvednutí" className="flex flex-wrap gap-2">
+    <nav aria-label="Datum vyzvednutí" className="flex flex-wrap items-center gap-2">
         {dates.map(({ date, unavailableReason }) => {
             const { weekday, dayMonth } = formatShortDate(date);
             const label = `${weekday} ${dayMonth}`;
@@ -39,20 +45,19 @@ const DatePicker = ({
                 );
             }
             return (
-                <Link
+                <TransitionLink
                     key={date}
                     href={`${PATH}?date=${date}`}
-                    aria-current={date === selected ? 'date' : undefined}
+                    current={date === selected}
                     className={
-                        date === selected
-                            ? 'rounded-lg border border-amber-800 bg-amber-800 px-4 py-2 font-medium text-white'
-                            : SECONDARY_BUTTON_CLASSES
+                        date === selected ? SELECTED_BUTTON_CLASSES : SECONDARY_BUTTON_CLASSES
                     }
                 >
                     {label}
-                </Link>
+                </TransitionLink>
             );
         })}
+        <DateTransitionStatus />
     </nav>
 );
 
@@ -92,13 +97,17 @@ const NewReservationContent = async ({ searchParams }: { searchParams: SearchPar
             : (firstOpenDate ?? dates[0].date);
 
     return (
-        <div className="flex flex-col gap-4">
-            <DatePicker dates={dates} selected={date} />
-            <h2 className="text-xl font-semibold text-amber-950">
-                Vyzvednutí {formatLongDate(date)}
-            </h2>
-            <ReservationFormSection date={date} now={now} />
-        </div>
+        <DateTransitionProvider>
+            <div className="flex flex-col gap-4">
+                <DatePicker dates={dates} selected={date} />
+                <DateTransitionContent>
+                    <h2 className="text-xl font-semibold text-amber-950">
+                        Vyzvednutí {formatLongDate(date)}
+                    </h2>
+                    <ReservationFormSection date={date} now={now} />
+                </DateTransitionContent>
+            </div>
+        </DateTransitionProvider>
     );
 };
 
