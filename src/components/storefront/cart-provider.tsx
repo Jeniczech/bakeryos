@@ -1,19 +1,26 @@
 'use client';
 
-import { createContext, use, useMemo, useReducer } from 'react';
+import { createContext, use, useMemo, useReducer, useState } from 'react';
 import { cartReducer, type Cart, type CartAction } from '@/lib/cart/cart';
+import type { CustomerDetails } from '@/lib/cart/customer-details';
 
-type CartContextValue = { cart: Cart; dispatch: React.Dispatch<CartAction> };
+type CartContextValue = {
+    cart: Cart;
+    dispatch: React.Dispatch<CartAction>;
+    customer: CustomerDetails;
+    setCustomer: React.Dispatch<React.SetStateAction<CustomerDetails>>;
+};
 
 const CartContext = createContext<CartContextValue | null>(null);
 
 /**
- * Lives in the order layout, so the cart survives date switches. Kept in memory only: a full
- * page reload empties it.
+ * Lives in the order layout, so the cart and the customer's details survive date switches,
+ * which remount the page's cart. Kept in memory only: a full page reload empties it.
  */
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     const [cart, dispatch] = useReducer(cartReducer, []);
-    const value = useMemo(() => ({ cart, dispatch }), [cart]);
+    const [customer, setCustomer] = useState<CustomerDetails>({ name: '', phone: '' });
+    const value = useMemo(() => ({ cart, dispatch, customer, setCustomer }), [cart, customer]);
     return <CartContext value={value}>{children}</CartContext>;
 };
 

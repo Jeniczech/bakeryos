@@ -4,6 +4,7 @@ import { useId } from 'react';
 import { reviewCart, type LiveProduct, type ReviewedCartLine } from '@/lib/cart/cart';
 import { formatPrice } from '@/lib/formatting/money';
 import { useCart } from './cart-provider';
+import { CustomerDetailsFields } from './customer-details-fields';
 import { QuantityStepper } from './quantity-stepper';
 
 /** The selected date's live catalog, as far as the cart needs it. */
@@ -149,6 +150,9 @@ export const CartSummary = ({ catalog }: { catalog: CartCatalog }) => {
                         {CATALOG_STATUS_MESSAGES[catalog.status]}
                     </p>
                 )}
+            </div>
+            <div className="border-t border-amber-200 pt-3">
+                <CustomerDetailsFields />
             </div>
         </section>
     );
