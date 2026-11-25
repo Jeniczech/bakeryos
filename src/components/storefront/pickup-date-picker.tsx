@@ -1,19 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useOptimistic, useTransition } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { formatShortDate } from '@/lib/formatting/dates';
 import type { PickupDateOption } from '@/server/domain/reservation-rules';
 import { PICKUP_DATE_LABELS } from './pickup-date-messages';
 
 export const PickupDatePicker = ({ dates }: { dates: readonly PickupDateOption[] }) => {
     // Read on the client: search-param changes do not re-render the layout this lives in.
-    const renderedDate = useSearchParams().get('date');
-    // Highlights the clicked date at once; falls back to the URL when the navigation commits or fails.
-    const [selectedDate, setSelectedDate] = useOptimistic(renderedDate);
-    const [, startTransition] = useTransition();
-    const router = useRouter();
+    const selectedDate = useSearchParams().get('date');
     return (
         <nav aria-labelledby="pickup-date-heading" className="flex flex-col gap-3">
             <h2 id="pickup-date-heading" className="text-lg font-semibold text-amber-950">
@@ -43,21 +38,12 @@ export const PickupDatePicker = ({ dates }: { dates: readonly PickupDateOption[]
                             </li>
                         );
                     }
-                    const href = `/?date=${date}`;
                     const isSelected = date === selectedDate;
                     return (
                         <li key={date}>
                             <Link
-                                href={href}
+                                href={{ pathname: '/', query: { date } }}
                                 scroll={false}
-                                onNavigate={(event) => {
-                                    // Same transition as the navigation, so the optimistic date holds until it commits.
-                                    event.preventDefault();
-                                    startTransition(() => {
-                                        setSelectedDate(date);
-                                        router.push(href, { scroll: false });
-                                    });
-                                }}
                                 // Resolves each date's cached catalog before the click.
                                 prefetch
                                 aria-current={isSelected ? 'date' : undefined}
