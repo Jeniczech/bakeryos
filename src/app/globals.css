@@ -12,9 +12,13 @@
     --font-mono: var(--font-geist-mono);
 }
 
-/* Hidden for the delay, then fades in: fast loads never show it. */
+/*
+ * Hidden for the delay, then fades in: fast loads never show it. Keep the delay well above
+ * React's 300 ms Suspense reveal throttle: once a fallback is painted, its content cannot
+ * replace it sooner, so a 300 ms delay would start the fade just as fast loads finish.
+ */
 @theme {
-    --animate-delayed-fade-in: delayed-fade-in 150ms ease-out 300ms both;
+    --animate-delayed-fade-in: delayed-fade-in 150ms ease-out 500ms both;
 
     @keyframes delayed-fade-in {
         from {
