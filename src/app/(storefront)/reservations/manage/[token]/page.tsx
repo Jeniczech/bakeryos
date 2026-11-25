@@ -2,13 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { connection } from 'next/server';
 import { Suspense } from 'react';
-import { CancelReservationButton } from '@/components/storefront/cancel-reservation-button';
+import { ReservationCancellation } from '@/components/storefront/reservation-cancellation';
 import { ReservationItems } from '@/components/storefront/reservation-items';
 import { SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
 import { formatLongDate, formatPragueDateTime } from '@/lib/formatting/dates';
 import { ReservationNotFoundError } from '@/server/domain/errors';
-import type { ReservationStatus } from '@/server/domain/reservation-rules';
 import {
     getReservationByToken,
     type ReservationDetails,
@@ -21,11 +20,35 @@ export const metadata: Metadata = {
     referrer: 'no-referrer',
 };
 
-const HEADINGS: Record<ReservationStatus, string> = {
-    confirmed: 'Vaše rezervace',
-    cancelled: 'Rezervace je zrušená',
-    picked_up: 'Rezervace byla vyzvednuta',
-    no_show: 'Rezervace nebyla vyzvednuta',
+/** The page's heading and the cancellation card's text for the reservation's current state. */
+const describeReservation = (
+    details: ReservationDetails,
+): { heading: string; cancellationNote: string } => {
+    const cutoff = formatPragueDateTime(details.cancellationCutoff);
+    switch (details.status) {
+        case 'confirmed':
+            return {
+                heading: 'Vaše rezervace',
+                cancellationNote: details.canCancel
+                    ? `Rezervaci můžete zrušit do ${cutoff}. Upravit ji nelze, místo toho ji zrušte a vytvořte novou.`
+                    : `Online zrušení bylo možné do ${cutoff}. Pokud nemůžete přijít, dejte prosím vědět pekárně.`,
+            };
+        case 'cancelled':
+            return {
+                heading: 'Rezervace je zrušená',
+                cancellationNote: 'Pečivo pro vás nechystáme. Můžete si vytvořit novou rezervaci.',
+            };
+        case 'picked_up':
+            return {
+                heading: 'Rezervace byla vyzvednuta',
+                cancellationNote: 'Rezervace je uzavřená.',
+            };
+        case 'no_show':
+            return {
+                heading: 'Rezervace nebyla vyzvednuta',
+                cancellationNote: 'Rezervace je uzavřená.',
+            };
+    }
 };
 
 const NewReservationLink = ({ label }: { label: string }) => (
@@ -33,50 +56,6 @@ const NewReservationLink = ({ label }: { label: string }) => (
         {label}
     </Link>
 );
-
-const CancellationSection = ({
-    details,
-    token,
-}: {
-    details: ReservationDetails;
-    token: string;
-}) => {
-    const cutoff = formatPragueDateTime(details.cancellationCutoff);
-    let content: React.ReactNode;
-    if (details.canCancel) {
-        content = (
-            <>
-                <p className="text-sm text-stone-600">
-                    Rezervaci můžete zrušit do {cutoff}. Upravit ji nelze, místo toho ji zrušte a
-                    vytvořte novou.
-                </p>
-                <CancelReservationButton token={token} />
-            </>
-        );
-    } else if (details.status === 'confirmed') {
-        content = (
-            <p className="text-sm text-stone-600">
-                Online zrušení bylo možné do {cutoff}. Pokud nemůžete přijít, dejte prosím vědět
-                pekárně.
-            </p>
-        );
-    } else if (details.status === 'cancelled') {
-        content = <p className="text-sm text-stone-600">Rezervace byla zrušena.</p>;
-    } else {
-        content = <p className="text-sm text-stone-600">Rezervaci už nelze měnit.</p>;
-    }
-    return (
-        <section
-            aria-labelledby="cancellation-heading"
-            className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-white p-4 shadow-sm"
-        >
-            <h2 id="cancellation-heading" className="text-lg font-semibold text-amber-950">
-                Zrušení
-            </h2>
-            {content}
-        </section>
-    );
-};
 
 const ManagedReservation = async ({
     params,
@@ -105,6 +84,7 @@ const ManagedReservation = async ({
         }
         throw error;
     }
+    const { heading, cancellationNote } = describeReservation(details);
     return (
         <section aria-labelledby="reservation-heading" className="flex flex-col gap-6">
             <div className="flex flex-col gap-2">
@@ -112,7 +92,7 @@ const ManagedReservation = async ({
                     id="reservation-heading"
                     className="text-3xl font-semibold tracking-tight text-amber-950"
                 >
-                    {HEADINGS[details.status]}
+                    {heading}
                 </h1>
                 <p className="text-stone-600">
                     Číslo rezervace{' '}
@@ -125,7 +105,13 @@ const ManagedReservation = async ({
             </div>
             <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
                 <ReservationItems items={details.items} totalPrice={details.totalPrice} />
-                <CancellationSection details={details} token={token} />
+                <ReservationCancellation
+                    token={token}
+                    canCancel={details.canCancel}
+                    cancellationCutoff={details.cancellationCutoff.toISOString()}
+                >
+                    {cancellationNote}
+                </ReservationCancellation>
             </div>
             <div>
                 <NewReservationLink label="Vytvořit další rezervaci" />
