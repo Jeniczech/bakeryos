@@ -1,10 +1,10 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/server/db/client';
 import { adminUsers } from '@/server/db/schema';
 import { consumeRateLimit, LOGIN_RATE_LIMIT } from '@/server/services/rate-limit';
-import { hashPassword, verifyPassword } from './password';
+import { verifyPassword } from './password';
 
 // Bounds the Argon2 work an attacker can request per attempt.
 const PASSWORD_MAX_LENGTH = 256;
@@ -28,13 +28,11 @@ const normalizeEmail = (email: unknown): string =>
 export const getLoginRateLimitKey = (clientIp: string, normalizedEmail: string): string =>
     `login:${clientIp}:${createHash('sha256').update(normalizedEmail).digest('hex')}`;
 
-// An unknown email is still checked against a hash, so response time does not reveal
-// whether the account exists.
-let dummyPasswordHash: Promise<string> | undefined;
-const getDummyPasswordHash = (): Promise<string> => {
-    dummyPasswordHash ??= hashPassword(randomBytes(32).toString('base64'));
-    return dummyPasswordHash;
-};
+// An unknown email is still checked against a hash with the same parameters, so response time
+// does not reveal whether the account exists. Its password was random and discarded. A constant
+// rather than a lazily computed hash, so the first attempt on a cold instance is not slower.
+const DUMMY_PASSWORD_HASH =
+    '$argon2id$v=19$m=19456,t=2,p=1$Ozp5Jk7fPaO/RQTkrFXFuQ$X07JPUXado75Ntw7xQglAtHzV+HxQIJl7Mf8F63BIv8';
 
 /**
  * Checks administrator credentials. Every attempt counts toward the login rate limit, including
@@ -73,7 +71,7 @@ export const authenticateAdmin = async (
         .from(adminUsers)
         .where(eq(adminUsers.email, parsed.data.email));
     const passwordMatches = await verifyPassword(
-        admin?.passwordHash ?? (await getDummyPasswordHash()),
+        admin?.passwordHash ?? DUMMY_PASSWORD_HASH,
         parsed.data.password,
     );
     if (!admin || !passwordMatches) {

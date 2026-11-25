@@ -23,7 +23,7 @@ pnpm dev                   # http://localhost:3000
 
 Set `MANAGEMENT_TOKEN_SECRET` in `.env` (min. 32 characters, e.g. `openssl rand -base64 32`) before creating reservations or running integration tests: reservation management tokens are derived from it.
 
-Set `AUTH_SECRET` in `.env` (e.g. `openssl rand -base64 32`) before signing in: Auth.js encrypts the admin session cookie with it. The admin signs in at `/admin/login` with `ADMIN_SEED_EMAIL` and `ADMIN_SEED_PASSWORD`.
+Set `AUTH_SECRET` in `.env` (e.g. `openssl rand -base64 32`) before signing in: Auth.js encrypts the admin session cookie with it. The admin signs in at `/admin/login` with `ADMIN_SEED_EMAIL` and `ADMIN_SEED_PASSWORD`. Sessions last 8 hours and are not checked against the database, so resetting the password through the seed does not end existing sessions; rotating `AUTH_SECRET` does.
 
 The seed is safe to re-run: it upserts the opening days and administrator (resetting the admin password from `ADMIN_SEED_PASSWORD`, min. 12 characters), adds missing closures, and inserts the demo catalog only when the `products` table is empty.
 
