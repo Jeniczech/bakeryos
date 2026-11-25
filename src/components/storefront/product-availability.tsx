@@ -7,6 +7,7 @@ import {
     type AvailableProduct,
 } from '@/server/services/products/get-available-products';
 import { getOnlinePickupDates } from './pickup-date-status';
+import { ProductCartControl } from './product-cart-control';
 
 type LiveCatalog =
     | { status: 'open'; products: Map<string, AvailableProduct> }
@@ -71,15 +72,25 @@ export const ProductAvailability = async ({
         return <Message>Tento produkt už nelze rezervovat.</Message>;
     }
     return (
-        <div className="flex items-baseline justify-between gap-3">
-            <span className="font-semibold text-amber-950">{formatPrice(product.price)}</span>
-            {product.remainingQuantity > 0 ? (
-                <span className="text-sm text-emerald-800">
-                    Zbývá {product.remainingQuantity} ks
-                </span>
-            ) : (
-                <span className="text-sm font-medium text-stone-500">Vyprodáno</span>
-            )}
+        <div className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between gap-3">
+                <span className="font-semibold text-amber-950">{formatPrice(product.price)}</span>
+                {product.remainingQuantity > 0 ? (
+                    <span className="text-sm text-emerald-800">
+                        Zbývá {product.remainingQuantity} ks
+                    </span>
+                ) : (
+                    <span className="text-sm font-medium text-stone-500">Vyprodáno</span>
+                )}
+            </div>
+            <ProductCartControl
+                product={{
+                    productId: product.id,
+                    name: product.name,
+                    unitPrice: product.price,
+                    availableQuantity: product.remainingQuantity,
+                }}
+            />
         </div>
     );
 };
