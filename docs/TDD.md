@@ -507,15 +507,16 @@ Flow: pickup date → eligible catalog → cart → name/phone → confirmation 
 - Show actionable errors for unavailable quantities and cutoff expiration.
 - Management link remains usable after page refresh.
 
-### 10.1 Storefront data loading
+### 10.1 Storefront caching
 
-- The storefront page renders per request (`connection()`) and is never cached: the pickup dates depend on the current time and availability on reservations.
-- Each pickup date is a `next/link` to `?date=`, rendered on the server per request (uncached): the online pickup dates plus the selected date's products with remaining availability.
-- A client `SelectedDateProvider` updates the selected date optimistically (`useOptimistic` + `router.push` in a transition), so the picker highlights the clicked date and the catalog shows a loading notice immediately, while the server renders the new date. The URL changes only when the navigation commits, once the server responds; it is not pushed early because Next 16 treats a native `history.pushState` as a navigation of its own.
-- Displayed availability is as of the last render. It is informational; `createReservation` rechecks everything transactionally.
-- Dates and times are formatted on the server, so the browser's `Intl` data cannot cause hydration mismatches.
-- `DEV_LATENCY_MS` delays storefront renders in development only, to imitate the hosted round trip (~200 ms or more on Netlify) that local responses hide.
-- Not chosen: loading the whole booking window into the client (switches instantly, but loads data for dates the customer may never open and bypasses `Link`); per-date `'use cache'` + `<Link prefetch>` (Next 16 did not use the per-link prefetch for these navigations, so every date switch waited for a server round trip).
+Caching only speeds up what the storefront displays; it never affects reservation or capacity checks, which always read the database inside the transaction.
+
+- **URLs:** `/` asks for a pickup date; each date is a path segment, `/den/YYYY-MM-DD`. A path segment (not `?date=`) is required for instant switching: Next 16 reuses the page segment when only search params change and then waits for the server instead of rendering the `<Link prefetch>` payload.
+- **Cached:** the products offered on a date (name, description, image, price), via `'use cache'` with `cacheLife('minutes')` and tag `catalog`. They do not depend on the current time. Date links use `prefetch`, so switching dates renders from the prefetched cache without a server round trip.
+- **Never cached:** anything that depends on the current time or on reservations — the pickup-date list (booking window, cutoff), the selected date's bookability, and remaining availability. These render per request behind `<Suspense>` after `connection()`.
+- The catalog renders only for dates in a cached list of bookable dates (5-minute expiry), which keeps it prefetchable and bounds its cache; the uncached status warning and the reservation transaction remain authoritative.
+- The pickup-date picker lives in a layout shared by `/` and `/den/[date]`, so the date list loads once per visit.
+- Admin mutations to products, product weekdays, opening days, or closures must invalidate the `catalog` tag. Until they do, displayed product details may be stale for minutes; prices shown at confirmation always come from the database.
 
 ## 11. Security and operational requirements
 

@@ -13,6 +13,7 @@ import {
 } from '@/server/db/schema';
 import { PickupDateUnavailableError } from '@/server/domain/errors';
 import { getAvailableProducts } from '@/server/services/products/get-available-products';
+import { getOfferedProducts } from '@/server/services/products/get-offered-products';
 import { createReservation } from '@/server/services/reservations/create-reservation';
 
 // Far outside any real booking window; the clock is injected relative to this date.
@@ -165,5 +166,37 @@ describe('getAvailableProducts', () => {
 
         await expect(attempt).rejects.toBeInstanceOf(PickupDateUnavailableError);
         await expect(attempt).rejects.toMatchObject({ code });
+    });
+});
+
+describe('getOfferedProducts', () => {
+    it('lists offered products without availability, regardless of the cutoff', async () => {
+        const wednesday = await insertProduct(
+            { name: 'Rye', description: 'Dark rye', price: 6500 },
+            [WEDNESDAY],
+        );
+        await insertProduct({ name: 'Monday loaf' }, [MONDAY]);
+        await insertProduct({ name: 'Inactive loaf', active: false });
+
+        const offered = await getOfferedProducts(PICKUP_DATE);
+
+        expect(offered?.filter((product) => createdProductIds.includes(product.id))).toEqual([
+            {
+                id: wednesday.id,
+                name: 'Rye',
+                description: 'Dark rye',
+                imageUrl: null,
+                price: 6500,
+            },
+        ]);
+    });
+
+    it.each([
+        ['an invalid date', '2099-02-30'],
+        ['a closed day', CLOSED_MONDAY],
+    ])('returns null for %s', async (_label, date) => {
+        await insertProduct();
+
+        expect(await getOfferedProducts(date)).toBeNull();
     });
 });

@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import type { PickupDateRejectionReason } from '@/server/domain/reservation-rules';
 import { PICKUP_DATE_LABELS } from './pickup-date-messages';
-import { useSelectedDate } from './selected-date';
 
+/** A pickup date with its labels already formatted on the server. */
 export type PickupDateChoice = {
     date: string;
     weekday: string;
@@ -13,7 +14,8 @@ export type PickupDateChoice = {
 };
 
 export const PickupDatePicker = ({ dates }: { dates: readonly PickupDateChoice[] }) => {
-    const { selectedDate, selectDate } = useSelectedDate();
+    // Read on the client: the layout this lives in does not re-render when the date changes.
+    const selectedDate = useParams<{ date?: string }>().date ?? null;
     return (
         <nav aria-labelledby="pickup-date-heading" className="flex flex-col gap-3">
             <h2 id="pickup-date-heading" className="text-lg font-semibold text-amber-950">
@@ -42,16 +44,14 @@ export const PickupDatePicker = ({ dates }: { dates: readonly PickupDateChoice[]
                             </li>
                         );
                     }
-                    const href = `/?date=${date}`;
                     const isSelected = date === selectedDate;
                     return (
                         <li key={date}>
                             <Link
-                                href={href}
-                                onNavigate={(event) => {
-                                    event.preventDefault();
-                                    selectDate(date, href);
-                                }}
+                                href={`/den/${date}`}
+                                scroll={false}
+                                // Resolves each date's cached catalog before the click.
+                                prefetch
                                 aria-current={isSelected ? 'date' : undefined}
                                 className={`flex h-full flex-col items-center rounded-lg border px-2 py-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 ${
                                     isSelected

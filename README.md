@@ -25,8 +25,6 @@ Set `MANAGEMENT_TOKEN_SECRET` in `.env` (min. 32 characters, e.g. `openssl rand 
 
 The seed is safe to re-run: it upserts the opening days and administrator (resetting the admin password from `ADMIN_SEED_PASSWORD`, min. 12 characters), adds missing closures, and inserts the demo catalog only when the `products` table is empty.
 
-To see the storefront with hosted latency locally, set `DEV_LATENCY_MS` (e.g. `400`) in `.env.local`; `next dev` then delays each storefront render by that many milliseconds. Production builds ignore it.
-
 `GET /api/health` returns `{"status":"ok","database":"ok"}` when the database is reachable, `503` otherwise.
 
 ## Public API
