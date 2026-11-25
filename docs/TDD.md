@@ -313,7 +313,7 @@ Both outcomes keep the items committed, so committed quantities do not change: t
 
 ### 6.6 `updateDailyPlan(input)`
 
-Authenticated admin only. Check eligibility (date and product, as for admin reservations); materialize and lock the plan; re-check eligibility after locking; aggregate committed quantities; reject if:
+Authenticated admin only. Check eligibility (date within the planning window and bakery-open, product active and offered; no cutoff); materialize and lock the plan; re-check eligibility after locking; aggregate committed quantities; reject if:
 
 ```text
 newCapacity < newWalkInQuantity + committedQuantity

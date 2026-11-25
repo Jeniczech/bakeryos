@@ -7,11 +7,8 @@ import { Notice } from '@/components/ui/notice';
 import { addDays, getPragueDate, isValidCalendarDate } from '@/lib/date-time/prague';
 import { formatLongDate } from '@/lib/formatting/dates';
 import { requireAdmin } from '@/server/auth/require-admin';
-import {
-    getBookingWindow,
-    getReservationCutoff,
-    isBeforeReservationCutoff,
-} from '@/server/domain/reservation-rules';
+import { getReservationCutoff } from '@/server/domain/reservation-rules';
+import { getPickupDates } from '@/server/services/eligibility';
 import { getDailyReservations } from '@/server/services/reservations/get-daily-reservations';
 
 type SearchParams = PageProps<'/admin/reservations'>['searchParams'];
@@ -59,12 +56,13 @@ const ReservationsContent = async ({ searchParams }: { searchParams: SearchParam
         typeof requestedDate === 'string' && isValidCalendarDate(requestedDate)
             ? requestedDate
             : today;
-    const reservations = await getDailyReservations(date, { now });
-    const bookingWindow = getBookingWindow(today);
-    const canBook =
-        date >= bookingWindow.firstDate &&
-        date <= bookingWindow.lastDate &&
-        isBeforeReservationCutoff(date, now);
+    const [reservations, pickupDates] = await Promise.all([
+        getDailyReservations(date, { now }),
+        getPickupDates(now),
+    ]);
+    const canBook = pickupDates.some(
+        (option) => option.date === date && option.unavailableReason === null,
+    );
 
     return (
         <div className="flex flex-col gap-4">

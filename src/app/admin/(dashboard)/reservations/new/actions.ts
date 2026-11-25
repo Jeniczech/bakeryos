@@ -37,6 +37,13 @@ export type ManualReservationResult =
 
 const FORM_FIELDS: readonly ManualReservationField[] = ['customer.name', 'customer.phone', 'items'];
 
+/**
+ * Outcomes that change what the page shows: remaining quantities or the offered products. Other
+ * rejections keep the page as it is, so the form and its entered details stay in place.
+ */
+const shouldRefresh = (result: ManualReservationResult): boolean =>
+    result.ok || result.error === 'INSUFFICIENT_CAPACITY' || result.error === 'PRODUCT_UNAVAILABLE';
+
 const toFormField = (path: string): ManualReservationField =>
     FORM_FIELDS.find((field) => path === field || path.startsWith(`${field}.`)) ?? 'other';
 
@@ -69,8 +76,7 @@ const toFailure = (error: unknown): ManualReservationResult => {
  * Records a phone reservation through the shared `createReservation` service. The `admin`
  * source is set here and overrides anything the client sends. Phone reservations follow the
  * online booking window, cutoff, opening days and capacity; only the online quantity limits
- * do not apply. A retry with the same idempotency key returns the original reservation. Every
- * outcome refreshes the page, so the remaining quantities stay current.
+ * do not apply. A retry with the same idempotency key returns the original reservation.
  */
 export const createManualReservation = async (
     input: ManualReservationInput,
@@ -89,6 +95,8 @@ export const createManualReservation = async (
     } catch (error) {
         result = toFailure(error);
     }
-    refresh();
+    if (shouldRefresh(result)) {
+        refresh();
+    }
     return result;
 };

@@ -97,8 +97,8 @@ const updateInTransaction = async (
  * Overrides one product/date's capacity and walk-in quantity under the shared locking
  * protocol (TDD §6.6): check eligibility, materialize and lock the plan, re-check
  * eligibility and read committed quantities after the lock, and reject any plan that would
- * no longer cover walk-ins plus commitments. Allowed after the online cutoff and for today,
- * never for past dates or outside the admin booking window. Callers must authorize the
+ * no longer cover walk-ins plus commitments. Allowed after the reservation cutoff and for
+ * today, never for past dates or outside the planning window (today through today+7). Callers must authorize the
  * administrator; `now` is injectable for tests and otherwise read at each check.
  */
 export const updateDailyPlan = async (

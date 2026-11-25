@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
+import { refresh } from 'next/cache';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     createManualReservation,
@@ -77,6 +78,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
     vi.setSystemTime(NOW);
+    vi.mocked(refresh).mockClear();
     session.current = { user: { id: randomUUID(), email: 'admin@example.com' } };
 });
 
@@ -127,6 +129,7 @@ describe('createManualReservation', () => {
         expect(await readReservations([bread.id])).toEqual([
             expect.objectContaining({ source: 'admin', status: 'confirmed' }),
         ]);
+        expect(refresh).toHaveBeenCalledOnce();
     });
 
     it('sets the admin source on the server, ignoring one sent by the client', async () => {
@@ -156,6 +159,8 @@ describe('createManualReservation', () => {
             shortages: [{ productId: bread.id, requested: 4, available: 3 }],
         });
         expect(await readReservations([bread.id, roll.id])).toHaveLength(0);
+        // The remaining quantities shown are stale, so the page reloads them.
+        expect(refresh).toHaveBeenCalledOnce();
     });
 
     it('rejects a late call at the cutoff, like an online reservation', async () => {
@@ -168,6 +173,8 @@ describe('createManualReservation', () => {
 
         expect(result).toEqual({ ok: false, error: 'CUTOFF_PASSED' });
         expect(await readReservations([bread.id])).toHaveLength(0);
+        // The form, its error and the entered details stay on the page.
+        expect(refresh).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -206,5 +213,6 @@ describe('createManualReservation', () => {
             error: 'INVALID_REQUEST',
             fields: expect.arrayContaining(['customer.name', 'customer.phone', 'items']),
         });
+        expect(refresh).not.toHaveBeenCalled();
     });
 });
