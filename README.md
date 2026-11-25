@@ -49,7 +49,7 @@ Request body for `POST /api/reservations` (TDD §8); any `source` or price field
 
 Errors are RFC 9457 Problem Details (`application/problem+json`) with a stable `code`, e.g. `INSUFFICIENT_CAPACITY` (409, with a `shortages` array), `CUTOFF_PASSED` (409), `IDEMPOTENCY_CONFLICT` (409), `RESERVATION_NOT_FOUND` (404), `RATE_LIMITED` (429 with `Retry-After`). Reservation creation is limited to 10 requests per client IP per 10 minutes, counted in the `rate_limits` table. On Netlify the client IP comes from `x-nf-client-connection-ip`, which Netlify sets itself. Elsewhere the last `x-forwarded-for` entry is used, which is only trustworthy behind exactly one proxy that appends it. Requests with neither header share a single `unknown` bucket.
 
-Management links (`/reservations/manage/:token`) are built from `APP_URL` when it is set, otherwise from the request's origin. They are bearer credentials. The application never logs them and all reservation responses are sent with `Cache-Control: no-store`, but the token is part of the URL path, so request logs outside the application (the Next.js dev server, hosting access logs) can contain it.
+Management links (`/reservations/manage/:token`) are built from `APP_URL` when it is set, otherwise from the request's origin. They are bearer credentials. The application never logs them and all reservation responses are sent with `Cache-Control: no-store`, but the token is part of the URL path, so request logs outside the application (the Next.js dev server, hosting access logs) can contain it. The management page is rendered per request, marked `noindex`, and sets `referrer: no-referrer` so the token does not leak to other sites.
 
 ## Scripts
 

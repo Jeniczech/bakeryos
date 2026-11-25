@@ -2,14 +2,12 @@
 
 import Link from 'next/link';
 import { useState, useSyncExternalStore } from 'react';
+import { SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
 import type { ReservationConfirmation } from '@/lib/cart/checkout';
 import { formatLongDate } from '@/lib/formatting/dates';
-import { formatPrice } from '@/lib/formatting/money';
 import { parseStoredConfirmation, readStoredConfirmationRaw } from './checkout-storage';
-
-const SECONDARY_BUTTON_CLASSES =
-    'rounded-lg border border-amber-300 bg-white px-4 py-2 font-medium text-amber-900 transition-colors hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700';
+import { ReservationItems } from './reservation-items';
 
 /** A replay reports the reservation's current status, which may have changed since. */
 const HEADINGS: Record<ReservationConfirmation['status'], string> = {
@@ -56,43 +54,7 @@ const ConfirmationDetails = ({ confirmation }: { confirmation: ReservationConfir
             </p>
         </div>
         <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-            <section
-                aria-labelledby="confirmation-items-heading"
-                className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-white p-4 shadow-sm"
-            >
-                <h2
-                    id="confirmation-items-heading"
-                    className="text-lg font-semibold text-amber-950"
-                >
-                    Rezervované pečivo
-                </h2>
-                <ul className="flex flex-col divide-y divide-amber-100">
-                    {confirmation.items.map((item) => (
-                        <li
-                            key={item.productId}
-                            className="flex items-baseline justify-between gap-3 py-2"
-                        >
-                            <span>
-                                <span className="font-medium text-amber-950">
-                                    {item.productName}
-                                </span>{' '}
-                                <span className="text-sm text-stone-500">
-                                    {item.quantity} × {formatPrice(item.unitPrice)}
-                                </span>
-                            </span>
-                            <span className="font-semibold">
-                                {formatPrice(item.unitPrice * item.quantity)}
-                            </span>
-                        </li>
-                    ))}
-                </ul>
-                <div className="flex items-baseline justify-between border-t border-amber-200 pt-3">
-                    <span className="font-semibold text-amber-950">Celkem</span>
-                    <span className="text-lg font-semibold text-amber-950">
-                        {formatPrice(confirmation.totalPrice)}
-                    </span>
-                </div>
-            </section>
+            <ReservationItems items={confirmation.items} totalPrice={confirmation.totalPrice} />
             <section
                 aria-labelledby="confirmation-link-heading"
                 className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-white p-4 shadow-sm"

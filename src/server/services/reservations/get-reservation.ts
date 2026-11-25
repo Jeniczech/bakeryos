@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, type SQL } from 'drizzle-orm';
 import { getDb, type DbExecutor } from '@/server/db/client';
 import { reservationItems, reservations } from '@/server/db/schema';
 import { ReservationNotFoundError } from '@/server/domain/errors';
@@ -39,15 +39,12 @@ export const findReservationIdByToken = async (
     return row?.id ?? null;
 };
 
-export const loadReservationDetails = async (
+const loadDetails = async (
     db: DbExecutor,
-    reservationId: string,
+    condition: SQL,
     now: Date,
 ): Promise<ReservationDetails> => {
-    const [reservation] = await db
-        .select()
-        .from(reservations)
-        .where(eq(reservations.id, reservationId));
+    const [reservation] = await db.select().from(reservations).where(condition);
     if (!reservation) {
         throw new ReservationNotFoundError();
     }
@@ -59,7 +56,7 @@ export const loadReservationDetails = async (
             quantity: reservationItems.quantity,
         })
         .from(reservationItems)
-        .where(eq(reservationItems.reservationId, reservationId));
+        .where(eq(reservationItems.reservationId, reservation.id));
     return {
         reservationId: reservation.id,
         reservationNumber: reservation.reservationNumber,
@@ -74,13 +71,23 @@ export const loadReservationDetails = async (
     };
 };
 
+export const loadReservationDetails = (
+    db: DbExecutor,
+    reservationId: string,
+    now: Date,
+): Promise<ReservationDetails> => loadDetails(db, eq(reservations.id, reservationId), now);
+
+/** Looks the reservation up by its token hash directly, without a separate id lookup. */
 export const getReservationByToken = async (
     token: string,
     options: { now?: Date } = {},
 ): Promise<ReservationDetails> => {
-    const reservationId = await findReservationIdByToken(getDb(), token);
-    if (!reservationId) {
+    if (!isWellFormedManagementToken(token)) {
         throw new ReservationNotFoundError();
     }
-    return loadReservationDetails(getDb(), reservationId, options.now ?? new Date());
+    return loadDetails(
+        getDb(),
+        eq(reservations.managementTokenHash, hashManagementToken(token)),
+        options.now ?? new Date(),
+    );
 };
