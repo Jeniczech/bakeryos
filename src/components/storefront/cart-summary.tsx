@@ -4,7 +4,6 @@ import { useId } from 'react';
 import { reviewCart, type LiveProduct, type ReviewedCartLine } from '@/lib/cart/cart';
 import { formatPrice } from '@/lib/formatting/money';
 import { useCart } from './cart-provider';
-import { CustomerDetailsFields } from './customer-details-fields';
 import { QuantityStepper } from './quantity-stepper';
 
 /** The selected date's live catalog, as far as the cart needs it. */
@@ -117,13 +116,12 @@ export const CartSummary = ({ catalog }: { catalog: CartCatalog }) => {
     return (
         <section
             aria-labelledby={headingId}
-            // The sticky sidebar stays within the viewport; long carts scroll their lines.
-            className="flex flex-col gap-4 rounded-xl border border-amber-200 bg-white p-4 shadow-sm lg:max-h-[calc(100dvh-3rem)]"
+            className="flex flex-col gap-4 rounded-xl border border-amber-200 bg-white p-4 shadow-sm"
         >
             <h2 id={headingId} className="text-lg font-semibold text-amber-950">
                 Košík
             </h2>
-            <ul className="flex min-h-0 flex-col divide-y divide-amber-100 overflow-y-auto">
+            <ul className="flex flex-col divide-y divide-amber-100">
                 {review.lines.map((reviewed) => (
                     <CartLineItem
                         key={reviewed.line.productId}
@@ -150,9 +148,6 @@ export const CartSummary = ({ catalog }: { catalog: CartCatalog }) => {
                         {CATALOG_STATUS_MESSAGES[catalog.status]}
                     </p>
                 )}
-            </div>
-            <div className="border-t border-amber-200 pt-3">
-                <CustomerDetailsFields />
             </div>
         </section>
     );

@@ -1,17 +1,15 @@
 'use client';
 
-import { useId, useState } from 'react';
-import {
-    validateCustomerDetails,
-    type CustomerDetails,
-    type CustomerDetailsErrors,
-} from '@/lib/cart/customer-details';
+import { useId } from 'react';
+import { validateCustomerDetails, type CustomerDetailsErrors } from '@/lib/cart/customer-details';
 import { CUSTOMER_NAME_MAX_LENGTH } from '@/lib/validation/reservation';
 import { useCart } from './cart-provider';
+import { useCustomer } from './customer-provider';
 
 const NAME_ERROR_MESSAGES: Record<NonNullable<CustomerDetailsErrors['name']>, string> = {
     REQUIRED: 'Vyplňte prosím jméno.',
     TOO_LONG: `Jméno může mít nejvýše ${CUSTOMER_NAME_MAX_LENGTH} znaků.`,
+    INVALID: 'Zadejte prosím platné jméno.',
 };
 
 const PHONE_ERROR_MESSAGES: Record<NonNullable<CustomerDetailsErrors['phone']>, string> = {
@@ -50,43 +48,48 @@ const TextField = ({
 };
 
 /**
- * Name and phone for the reservation, kept in the cart provider. A field's error shows once
- * the customer has left it, so nobody is warned while still typing.
+ * Name and phone for the reservation, shown while the cart has items. Rendered outside the
+ * cart's loading boundary, so a field is never replaced while the customer types. A field's
+ * error shows once the customer has left it.
  */
-export const CustomerDetailsFields = () => {
-    const { customer, setCustomer } = useCart();
-    const [touched, setTouched] = useState({ name: false, phone: false });
+export const CustomerDetailsCard = () => {
+    const { cart } = useCart();
+    const { customer, touched, setField, markTouched } = useCustomer();
+    const headingId = useId();
+    if (cart.length === 0) {
+        return null;
+    }
     const errors = validateCustomerDetails(customer);
-    const fieldProps = (field: keyof CustomerDetails) => ({
-        value: customer[field],
-        onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
-            const { value } = event.target;
-            setCustomer((current) => ({ ...current, [field]: value }));
-        },
-        onBlur: () => setTouched((current) => ({ ...current, [field]: true })),
-    });
     return (
-        <fieldset className="flex flex-col gap-3">
-            <legend className="mb-1 font-semibold text-amber-950">Kontaktní údaje</legend>
+        <section
+            aria-labelledby={headingId}
+            className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-white p-4 shadow-sm"
+        >
+            <h2 id={headingId} className="text-lg font-semibold text-amber-950">
+                Kontaktní údaje
+            </h2>
             <TextField
-                {...fieldProps('name')}
                 label="Jméno a příjmení"
                 error={touched.name && errors.name ? NAME_ERROR_MESSAGES[errors.name] : null}
+                value={customer.name}
+                onChange={(event) => setField('name', event.target.value)}
+                onBlur={() => markTouched('name')}
                 type="text"
                 autoComplete="name"
-                maxLength={CUSTOMER_NAME_MAX_LENGTH}
                 required
             />
             <TextField
-                {...fieldProps('phone')}
                 label="Telefon"
                 error={touched.phone && errors.phone ? PHONE_ERROR_MESSAGES[errors.phone] : null}
+                value={customer.phone}
+                onChange={(event) => setField('phone', event.target.value)}
+                onBlur={() => markTouched('phone')}
                 type="tel"
                 autoComplete="tel"
                 inputMode="tel"
                 placeholder="+420 777 123 456"
                 required
             />
-        </fieldset>
+        </section>
     );
 };

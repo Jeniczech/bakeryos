@@ -1,26 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { hasCustomerDetailsErrors, validateCustomerDetails } from '@/lib/cart/customer-details';
+import { validateCustomerDetails } from '@/lib/cart/customer-details';
 
 describe('validateCustomerDetails', () => {
     it('accepts a name and a lightly formatted phone number', () => {
-        const errors = validateCustomerDetails({ name: ' Jana ', phone: '+420 (777) 123-456' });
-        expect(errors).toEqual({ name: null, phone: null });
-        expect(hasCustomerDetailsErrors(errors)).toBe(false);
+        expect(validateCustomerDetails({ name: ' Jana ', phone: '+420 (777) 123-456' })).toEqual({
+            name: null,
+            phone: null,
+        });
     });
 
     it('requires both fields', () => {
-        const errors = validateCustomerDetails({ name: '   ', phone: ' ' });
-        expect(errors).toEqual({ name: 'REQUIRED', phone: 'REQUIRED' });
-        expect(hasCustomerDetailsErrors(errors)).toBe(true);
+        expect(validateCustomerDetails({ name: '   ', phone: ' ' })).toEqual({
+            name: 'REQUIRED',
+            phone: 'REQUIRED',
+        });
     });
 
-    it('rejects names over 100 characters', () => {
-        expect(validateCustomerDetails({ name: 'a'.repeat(101), phone: '777123456' }).name).toBe(
-            'TOO_LONG',
-        );
-        expect(
-            validateCustomerDetails({ name: 'a'.repeat(100), phone: '777123456' }).name,
-        ).toBeNull();
+    it('limits names to 100 characters after trimming', () => {
+        const valid = (name: string) => validateCustomerDetails({ name, phone: '777123456' }).name;
+        expect(valid('a'.repeat(101))).toBe('TOO_LONG');
+        expect(valid(`  ${'a'.repeat(100)}  `)).toBeNull();
     });
 
     it('rejects phone numbers outside 9–15 digits or with other characters', () => {

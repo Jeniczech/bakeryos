@@ -3,8 +3,25 @@ import { customerNameSchema, phoneSchema } from '@/lib/validation/reservation';
 export type CustomerDetails = { name: string; phone: string };
 
 export type CustomerDetailsErrors = {
-    name: 'REQUIRED' | 'TOO_LONG' | null;
+    name: 'REQUIRED' | 'TOO_LONG' | 'INVALID' | null;
     phone: 'REQUIRED' | 'INVALID' | null;
+};
+
+const NAME_ISSUE_ERRORS: Partial<Record<string, CustomerDetailsErrors['name']>> = {
+    too_small: 'REQUIRED',
+    too_big: 'TOO_LONG',
+};
+
+const getNameError = (name: string): CustomerDetailsErrors['name'] => {
+    const result = customerNameSchema.safeParse(name);
+    return result.success ? null : (NAME_ISSUE_ERRORS[result.error.issues[0].code] ?? 'INVALID');
+};
+
+const getPhoneError = (phone: string): CustomerDetailsErrors['phone'] => {
+    if (phone.trim() === '') {
+        return 'REQUIRED';
+    }
+    return phoneSchema.safeParse(phone).success ? null : 'INVALID';
 };
 
 /**
@@ -15,17 +32,6 @@ export const validateCustomerDetails = ({
     name,
     phone,
 }: CustomerDetails): CustomerDetailsErrors => ({
-    name: customerNameSchema.safeParse(name).success
-        ? null
-        : name.trim() === ''
-          ? 'REQUIRED'
-          : 'TOO_LONG',
-    phone: phoneSchema.safeParse(phone).success
-        ? null
-        : phone.trim() === ''
-          ? 'REQUIRED'
-          : 'INVALID',
+    name: getNameError(name),
+    phone: getPhoneError(phone),
 });
-
-export const hasCustomerDetailsErrors = (errors: CustomerDetailsErrors): boolean =>
-    errors.name !== null || errors.phone !== null;
