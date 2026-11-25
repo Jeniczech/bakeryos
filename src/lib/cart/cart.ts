@@ -19,7 +19,8 @@ export type LiveProduct = CartProduct & { unitPrice: number };
 
 export type CartAction =
     | { type: 'setQuantity'; product: CartProduct; quantity: number }
-    | { type: 'remove'; productId: string };
+    | { type: 'remove'; productId: string }
+    | { type: 'clear' };
 
 export type QuantityLimit = 'AVAILABILITY' | 'PRODUCT_LIMIT' | 'RESERVATION_LIMIT';
 
@@ -67,6 +68,9 @@ export const getQuantityLimit = (cart: Cart, product: CartProduct): QuantityLimi
 export const cartReducer = (cart: Cart, action: CartAction): Cart => {
     if (action.type === 'remove') {
         return cart.filter((line) => line.productId !== action.productId);
+    }
+    if (action.type === 'clear') {
+        return [];
     }
     const { product, quantity } = action;
     if (!Number.isInteger(quantity) || quantity < 0) {

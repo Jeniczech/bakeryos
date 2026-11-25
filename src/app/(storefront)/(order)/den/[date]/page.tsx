@@ -1,7 +1,8 @@
 import { Suspense } from 'react';
 import { CartColumns } from '@/components/storefront/cart-columns';
 import { CartSummary } from '@/components/storefront/cart-summary';
-import { LiveCartSummary } from '@/components/storefront/live-cart-summary';
+import { CheckoutButton } from '@/components/storefront/checkout-button';
+import { LiveCartSummary, LiveCheckoutButton } from '@/components/storefront/live-cart-summary';
 import { PickupDateStatus } from '@/components/storefront/pickup-date-status';
 import { ProductCatalog } from '@/components/storefront/product-catalog';
 import { Notice } from '@/components/ui/notice';
@@ -14,6 +15,10 @@ const DateStatus = async ({ params }: { params: DateParams }) => (
 
 const DateCart = async ({ params }: { params: DateParams }) => (
     <LiveCartSummary pickupDate={(await params).date} />
+);
+
+const DateCheckout = async ({ params }: { params: DateParams }) => (
+    <LiveCheckoutButton pickupDate={(await params).date} />
 );
 
 const DateCatalog = async ({ params }: { params: DateParams }) => (
@@ -31,6 +36,13 @@ const PickupDatePage = ({ params }: PageProps<'/den/[date]'>) => (
             // Prices and availability are per request, like the cards' live details.
             <Suspense fallback={<CartSummary catalog={{ status: 'loading' }} pickupDate={null} />}>
                 <DateCart params={params} />
+            </Suspense>
+        }
+        checkout={
+            <Suspense
+                fallback={<CheckoutButton catalog={{ status: 'loading' }} pickupDate={null} />}
+            >
+                <DateCheckout params={params} />
             </Suspense>
         }
     >

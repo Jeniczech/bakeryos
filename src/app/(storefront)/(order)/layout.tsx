@@ -1,6 +1,7 @@
 import { connection } from 'next/server';
 import { Suspense } from 'react';
 import { CartProvider } from '@/components/storefront/cart-provider';
+import { CheckoutProvider } from '@/components/storefront/checkout-provider';
 import { CustomerProvider } from '@/components/storefront/customer-provider';
 import {
     PickupDatePicker,
@@ -26,27 +27,29 @@ const PickupDates = async () => {
 /**
  * Shared by `/` and `/den/[date]` and not re-rendered on a date switch, so the date list loads
  * once per visit while the page below swaps the catalog for each date, and the cart survives
- * date switches.
+ * date switches. After a reservation, `CheckoutProvider` shows its confirmation instead.
  */
 const OrderLayout = ({ children }: LayoutProps<'/'>) => (
     <CartProvider>
         <CustomerProvider>
-            <div className="flex flex-col gap-8">
-                <section className="flex flex-col gap-2">
-                    <h1 className="text-3xl font-semibold tracking-tight text-amber-950">
-                        Rezervujte si pečivo
-                    </h1>
-                    <p className="text-stone-600">
-                        Vyberte den vyzvednutí, zvolte chléb a pečivo a zaplaťte až při převzetí.
-                        Objednávky přijímáme do 18:00 předchozího dne.
-                    </p>
-                </section>
-                <Suspense fallback={<Notice>Načítáme dny vyzvednutí…</Notice>}>
-                    <PickupDates />
-                </Suspense>
-                {/* Each page renders the cart beside its content, checked against its date. */}
-                {children}
-            </div>
+            <CheckoutProvider>
+                <div className="flex flex-col gap-8">
+                    <section className="flex flex-col gap-2">
+                        <h1 className="text-3xl font-semibold tracking-tight text-amber-950">
+                            Rezervujte si pečivo
+                        </h1>
+                        <p className="text-stone-600">
+                            Vyberte den vyzvednutí, zvolte chléb a pečivo a zaplaťte až při
+                            převzetí. Objednávky přijímáme do 18:00 předchozího dne.
+                        </p>
+                    </section>
+                    <Suspense fallback={<Notice>Načítáme dny vyzvednutí…</Notice>}>
+                        <PickupDates />
+                    </Suspense>
+                    {/* Each page renders the cart beside its content, checked against its date. */}
+                    {children}
+                </div>
+            </CheckoutProvider>
         </CustomerProvider>
     </CartProvider>
 );

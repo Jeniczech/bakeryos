@@ -2,6 +2,7 @@
 
 import { getQuantityLimit, type CartProduct } from '@/lib/cart/cart';
 import { useCartEditor } from './cart-provider';
+import { useCheckout } from './checkout-provider';
 import { CART_CONTROL_ROW_CLASSES, LimitHint } from './limit-hint';
 
 const BUTTON_CLASSES =
@@ -26,6 +27,7 @@ export const QuantityStepper = ({
     announce: boolean;
 }) => {
     const { cart, dispatch } = useCartEditor(pickupDate);
+    const { submitting } = useCheckout();
     const limit = getQuantityLimit(cart, product);
     const QuantityText = announce ? 'output' : 'span';
     const setQuantity = (next: number) =>
@@ -35,6 +37,7 @@ export const QuantityStepper = ({
             <button
                 type="button"
                 onClick={() => setQuantity(quantity - 1)}
+                disabled={submitting}
                 aria-label={`Odebrat 1 ks: ${product.name}`}
                 className={BUTTON_CLASSES}
             >
@@ -47,7 +50,7 @@ export const QuantityStepper = ({
             <button
                 type="button"
                 onClick={() => setQuantity(quantity + 1)}
-                disabled={limit !== null}
+                disabled={limit !== null || submitting}
                 aria-label={`Přidat 1 ks: ${product.name}`}
                 className={BUTTON_CLASSES}
             >

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, use, useMemo, useReducer } from 'react';
+import { createContext, use, useCallback, useMemo, useReducer } from 'react';
 import {
     cartStateReducer,
     type CartAction,
@@ -45,4 +45,10 @@ export const useCartEditor = (
     const context = useCartContext();
     const { dispatchDated } = context;
     return { ...context, dispatch: (action) => dispatchDated({ ...action, pickupDate }) };
+};
+
+/** Empties the cart; stable across cart changes. */
+export const useClearCart = (): (() => void) => {
+    const { dispatchDated } = useCartContext();
+    return useCallback(() => dispatchDated({ type: 'clear', pickupDate: null }), [dispatchDated]);
 };
