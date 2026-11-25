@@ -510,10 +510,12 @@ Flow: pickup date → eligible catalog → cart → name/phone → confirmation 
 ### 10.1 Storefront data loading
 
 - The storefront page renders per request (`connection()`) and is never cached: the pickup dates depend on the current time and availability on reservations.
-- One read (`getOnlineCatalog`) loads the whole online booking window: every date with its bookability, and each bookable date's products with remaining availability. A client component switches dates locally and syncs `?date=` with `history.pushState`, so date changes never wait for the server. Refreshes, shared links, and the back button keep working.
-- Displayed availability is as of page load. It is informational; `createReservation` rechecks everything transactionally.
+- Each pickup date is a `next/link` to `?date=`, rendered on the server per request (uncached): the online pickup dates plus the selected date's products with remaining availability.
+- A client `SelectedDateProvider` updates the selected date optimistically (`useOptimistic` + `router.push` in a transition), so the picker highlights the clicked date and the catalog shows a loading notice immediately, while the server renders the new date. The URL changes only when the navigation commits, once the server responds; it is not pushed early because Next 16 treats a native `history.pushState` as a navigation of its own.
+- Displayed availability is as of the last render. It is informational; `createReservation` rechecks everything transactionally.
 - Dates and times are formatted on the server, so the browser's `Intl` data cannot cause hydration mismatches.
-- Not chosen: per-date server rendering with `'use cache'` and `<Link prefetch>`. Next 16 did not use the per-link prefetch for these navigations, so every date switch waited for a server round trip (~200 ms or more on Netlify).
+- `DEV_LATENCY_MS` delays storefront renders in development only, to imitate the hosted round trip (~200 ms or more on Netlify) that local responses hide.
+- Not chosen: loading the whole booking window into the client (switches instantly, but loads data for dates the customer may never open and bypasses `Link`); per-date `'use cache'` + `<Link prefetch>` (Next 16 did not use the per-link prefetch for these navigations, so every date switch waited for a server round trip).
 
 ## 11. Security and operational requirements
 
