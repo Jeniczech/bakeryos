@@ -111,6 +111,15 @@ export class PlanBelowCommitmentsError extends DomainError {
     }
 }
 
+/** The product was saved by someone else since the editor loaded it. */
+export class ProductChangedError extends DomainError {
+    readonly code = 'PRODUCT_CHANGED';
+
+    constructor(readonly productId: string) {
+        super('The product was changed in the meantime.');
+    }
+}
+
 /** Also used for malformed or unknown management tokens, so a response never reveals which. */
 export class ReservationNotFoundError extends DomainError {
     readonly code = 'RESERVATION_NOT_FOUND';

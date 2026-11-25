@@ -20,6 +20,7 @@ const EditProductContent = async ({ params }: { params: Params }) => {
         <ProductForm
             product={{
                 id: product.id,
+                version: product.version,
                 values: {
                     name: product.name,
                     description: product.description ?? '',

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useActionState, useId } from 'react';
 import {
     createProductAction,
@@ -30,6 +31,8 @@ const FIELD_MESSAGES: Record<ProductField, string> = {
 const ERROR_MESSAGES: Record<Exclude<ProductFormState['error'], null>, string> = {
     INVALID_REQUEST: 'Opravte prosím zvýrazněná pole.',
     NOT_FOUND: 'Produkt nebyl nalezen.',
+    CHANGED:
+        'Produkt mezitím někdo upravil, změny proto nebyly uloženy. Načtěte aktuální údaje a upravte je znovu.',
     UNAVAILABLE: 'Produkt se nepodařilo uložit. Zkuste to prosím znovu.',
 };
 
@@ -91,16 +94,26 @@ const TextField = ({
     );
 };
 
+type EditedProduct = { id: string; version: string; values: ProductFormValues };
+
 /**
- * Creates a product, or edits one when `product` is given. Rejected input comes back from the
- * action with the submitted values, which become the inputs' defaults after React resets the
- * form.
+ * Creates a product, or edits one when `product` is given. Next.js keeps visited pages mounted
+ * while hidden, so the form is keyed to start fresh: on each new visit (`bfcacheId`, kept on
+ * back/forward) and whenever the product was saved (`version`). Otherwise a reopened editor
+ * would show the values it was first loaded with.
  */
-export const ProductForm = ({
-    product,
-}: {
-    product?: { id: string; values: ProductFormValues };
-}) => {
+export const ProductForm = ({ product }: { product?: EditedProduct }) => {
+    const { bfcacheId } = useRouter();
+    return (
+        <ProductFormFields key={`${bfcacheId}:${product?.version ?? 'new'}`} product={product} />
+    );
+};
+
+/**
+ * Rejected input comes back from the action with the submitted values, which become the inputs'
+ * defaults after React resets the form.
+ */
+const ProductFormFields = ({ product }: { product?: EditedProduct }) => {
     const [state, formAction, pending] = useActionState(
         product ? updateProductAction : createProductAction,
         { error: null, fields: [], values: product?.values ?? EMPTY_VALUES },
@@ -113,8 +126,29 @@ export const ProductForm = ({
 
     return (
         <form action={formAction} className="flex max-w-2xl flex-col gap-6">
-            {product && <input type="hidden" name="productId" value={product.id} />}
-            {state.error && <Notice tone="warning">{ERROR_MESSAGES[state.error]}</Notice>}
+            {product && (
+                <>
+                    <input type="hidden" name="productId" value={product.id} />
+                    <input type="hidden" name="version" value={product.version} />
+                </>
+            )}
+            {state.error && (
+                <Notice tone="warning">
+                    {ERROR_MESSAGES[state.error]}
+                    {state.error === 'CHANGED' && product && (
+                        <>
+                            {' '}
+                            {/* A fresh navigation remounts the form with the stored values. */}
+                            <Link
+                                href={`/admin/products/${product.id}`}
+                                className="font-medium underline"
+                            >
+                                Načíst aktuální údaje
+                            </Link>
+                        </>
+                    )}
+                </Notice>
+            )}
             <fieldset disabled={pending} className="flex flex-col gap-4">
                 <TextField
                     field="name"

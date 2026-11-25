@@ -17,8 +17,14 @@ import {
     reservationItems,
     reservations,
 } from '@/server/db/schema';
-import { ProductNotFoundError, ProductUnavailableError } from '@/server/domain/errors';
+import {
+    InvalidRequestError,
+    ProductChangedError,
+    ProductNotFoundError,
+    ProductUnavailableError,
+} from '@/server/domain/errors';
 import { getOfferedProducts } from '@/server/services/products/get-offered-products';
+import { getProduct } from '@/server/services/products/admin-products';
 import { updateProduct } from '@/server/services/products/update-product';
 import { createReservation } from '@/server/services/reservations/create-reservation';
 
@@ -63,7 +69,7 @@ const validValues = (overrides: Partial<ProductFormValues> = {}): ProductFormVal
     ...overrides,
 });
 
-const toFormData = (values: ProductFormValues, productId?: string) => {
+const toFormData = (values: ProductFormValues, product?: { id: string; version: string }) => {
     const formData = new FormData();
     for (const [field, value] of Object.entries(values)) {
         if (field === 'active') {
@@ -74,8 +80,9 @@ const toFormData = (values: ProductFormValues, productId?: string) => {
             formData.set(field, String(value));
         }
     }
-    if (productId) {
-        formData.set('productId', productId);
+    if (product) {
+        formData.set('productId', product.id);
+        formData.set('version', product.version);
     }
     return formData;
 };
@@ -90,7 +97,11 @@ const insertProduct = async (overrides: Partial<typeof products.$inferInsert> = 
             ...overrides,
         })
         .returning();
-    return product;
+    const loaded = await getProduct(product.id);
+    if (!loaded) {
+        throw new Error('The inserted product was not found.');
+    }
+    return loaded;
 };
 
 const readProduct = async (productId: string) => {
@@ -213,10 +224,7 @@ describe('updateProductAction', () => {
         const product = await insertProduct();
 
         await expectRedirectTo(
-            updateProductAction(
-                INITIAL_STATE,
-                toFormData(validValues({ active: false }), product.id),
-            ),
+            updateProductAction(INITIAL_STATE, toFormData(validValues({ active: false }), product)),
             '/admin/login',
         );
         expect(await readProduct(product.id)).toMatchObject({
@@ -231,7 +239,7 @@ describe('updateProductAction', () => {
         await expectRedirectTo(
             updateProductAction(
                 INITIAL_STATE,
-                toFormData(validValues({ active: false, imageUrl: '' }), product.id),
+                toFormData(validValues({ active: false, imageUrl: '' }), product),
             ),
             '/admin/products',
         );
@@ -247,8 +255,34 @@ describe('updateProductAction', () => {
 
     it.each([randomUUID(), 'not-a-uuid'])('reports an unknown product %s', async (productId) => {
         await expect(
-            updateProductAction(INITIAL_STATE, toFormData(validValues(), productId)),
+            updateProductAction(
+                INITIAL_STATE,
+                toFormData(validValues(), { id: productId, version: '1' }),
+            ),
         ).resolves.toMatchObject({ error: 'NOT_FOUND' });
+        expect(updateTag).not.toHaveBeenCalled();
+    });
+
+    it('rejects a form loaded before the last save instead of undoing that save', async () => {
+        const product = await insertProduct();
+        await expectRedirectTo(
+            updateProductAction(
+                INITIAL_STATE,
+                toFormData(validValues({ name: `${TEST_PRODUCT_PREFIX} renamed` }), product),
+            ),
+            '/admin/products',
+        );
+        vi.mocked(updateTag).mockClear();
+
+        const staleValues = validValues({ name: product.name, defaultCapacity: '51' });
+        await expect(
+            updateProductAction(INITIAL_STATE, toFormData(staleValues, product)),
+        ).resolves.toEqual({ error: 'CHANGED', fields: [], values: staleValues });
+
+        expect(await readProduct(product.id)).toMatchObject({
+            name: `${TEST_PRODUCT_PREFIX} renamed`,
+            defaultCapacity: 40,
+        });
         expect(updateTag).not.toHaveBeenCalled();
     });
 });
@@ -258,13 +292,17 @@ describe('updateProduct and existing reservations', () => {
         const product = await insertProduct({ price: 3000 });
         const reservation = await reserve(product.id);
 
-        await updateProduct(product.id, {
-            name: `${TEST_PRODUCT_PREFIX} renamed`,
-            price: 9900,
-            defaultCapacity: 10,
-            defaultWalkInQuantity: 0,
-            active: false,
-        });
+        await updateProduct(
+            product.id,
+            {
+                name: `${TEST_PRODUCT_PREFIX} renamed`,
+                price: 9900,
+                defaultCapacity: 10,
+                defaultWalkInQuantity: 0,
+                active: false,
+            },
+            product.version,
+        );
 
         const items = await getDb()
             .select()
@@ -287,13 +325,17 @@ describe('updateProduct and existing reservations', () => {
 
     it('blocks new reservations and withdraws a deactivated product from the catalog', async () => {
         const product = await insertProduct();
-        await updateProduct(product.id, {
-            name: product.name,
-            price: product.price,
-            defaultCapacity: product.defaultCapacity,
-            defaultWalkInQuantity: product.defaultWalkInQuantity,
-            active: false,
-        });
+        await updateProduct(
+            product.id,
+            {
+                name: product.name,
+                price: product.price,
+                defaultCapacity: product.defaultCapacity,
+                defaultWalkInQuantity: product.defaultWalkInQuantity,
+                active: false,
+            },
+            product.version,
+        );
 
         await expect(reserve(product.id)).rejects.toBeInstanceOf(ProductUnavailableError);
         const items = await getDb()
@@ -308,13 +350,50 @@ describe('updateProduct and existing reservations', () => {
 
     it('rejects an unknown product without writing', async () => {
         await expect(
-            updateProduct(randomUUID(), {
-                name: 'Ghost',
-                price: 100,
-                defaultCapacity: 1,
-                defaultWalkInQuantity: 0,
-                active: true,
-            }),
+            updateProduct(
+                randomUUID(),
+                {
+                    name: 'Ghost',
+                    price: 100,
+                    defaultCapacity: 1,
+                    defaultWalkInQuantity: 0,
+                    active: true,
+                },
+                '1',
+            ),
         ).rejects.toBeInstanceOf(ProductNotFoundError);
+    });
+
+    it('returns a new version on each save and rejects the previous one', async () => {
+        const product = await insertProduct();
+        const input = {
+            name: product.name,
+            price: product.price,
+            defaultCapacity: 12,
+            defaultWalkInQuantity: 0,
+            active: true,
+        };
+
+        const saved = await updateProduct(product.id, input, product.version);
+        expect(saved.version).not.toBe(product.version);
+        expect(saved.version).toBe((await getProduct(product.id))?.version);
+
+        await expect(
+            updateProduct(product.id, { ...input, defaultCapacity: 13 }, product.version),
+        ).rejects.toBeInstanceOf(ProductChangedError);
+        expect((await readProduct(product.id)).defaultCapacity).toBe(12);
+    });
+
+    it('rejects a malformed version without writing', async () => {
+        const product = await insertProduct();
+
+        await expect(
+            updateProduct(
+                product.id,
+                { ...product, defaultCapacity: 99, description: null, imageUrl: null },
+                'abc',
+            ),
+        ).rejects.toBeInstanceOf(InvalidRequestError);
+        expect((await readProduct(product.id)).defaultCapacity).toBe(10);
     });
 });

@@ -4,7 +4,11 @@ import { updateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { parseCrownsToHalere, type ProductInput } from '@/lib/validation/product';
 import { requireAdmin } from '@/server/auth/require-admin';
-import { InvalidRequestError, ProductNotFoundError } from '@/server/domain/errors';
+import {
+    InvalidRequestError,
+    ProductChangedError,
+    ProductNotFoundError,
+} from '@/server/domain/errors';
 import { createProduct } from '@/server/services/products/create-product';
 import { updateProduct } from '@/server/services/products/update-product';
 
@@ -15,7 +19,7 @@ export type ProductField =
 export type ProductFormValues = Record<ProductField, string> & { active: boolean };
 
 export type ProductFormState = {
-    error: 'INVALID_REQUEST' | 'NOT_FOUND' | 'UNAVAILABLE' | null;
+    error: 'INVALID_REQUEST' | 'NOT_FOUND' | 'CHANGED' | 'UNAVAILABLE' | null;
     fields: ProductField[];
     values: ProductFormValues;
 };
@@ -71,6 +75,9 @@ const toFailure = (error: unknown, values: ProductFormValues): ProductFormState 
     if (error instanceof ProductNotFoundError) {
         return { error: 'NOT_FOUND', fields: [], values };
     }
+    if (error instanceof ProductChangedError) {
+        return { error: 'CHANGED', fields: [], values };
+    }
     console.error('[admin] product save failed', error);
     return { error: 'UNAVAILABLE', fields: [], values };
 };
@@ -101,14 +108,22 @@ export const createProductAction = async (
     return saveProduct(formData, createProduct);
 };
 
-/** Edits and deactivates (an unchecked `active` box) a product. */
+/**
+ * Edits and deactivates (an unchecked `active` box) a product. The form's `version` must match
+ * the stored one, so a form loaded before another save is rejected instead of undoing it.
+ */
 export const updateProductAction = async (
     _previous: ProductFormState,
     formData: FormData,
 ): Promise<ProductFormState> => {
     await requireAdmin();
     const productId = formData.get('productId');
+    const version = formData.get('version');
     return saveProduct(formData, (input) =>
-        updateProduct(typeof productId === 'string' ? productId : '', input),
+        updateProduct(
+            typeof productId === 'string' ? productId : '',
+            input,
+            typeof version === 'string' ? version : '',
+        ),
     );
 };

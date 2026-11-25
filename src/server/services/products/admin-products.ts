@@ -1,4 +1,4 @@
-import { asc, desc, eq } from 'drizzle-orm';
+import { asc, desc, eq, sql } from 'drizzle-orm';
 import { uuidSchema } from '@/lib/validation/reservation';
 import { getDb } from '@/server/db/client';
 import { products } from '@/server/db/schema';
@@ -12,7 +12,15 @@ export type AdminProduct = {
     active: boolean;
     defaultCapacity: number;
     defaultWalkInQuantity: number;
+    /** Changes on every save; an editor sends it back so a stale form cannot overwrite. */
+    version: string;
 };
+
+/**
+ * `updated_at` in whole microseconds, as text: exact, unlike a JavaScript `Date`, which drops
+ * the microseconds PostgreSQL stores.
+ */
+export const productVersion = sql<string>`(extract(epoch from ${products.updatedAt}) * 1000000)::bigint::text`;
 
 export const adminProductColumns = {
     id: products.id,
@@ -23,6 +31,7 @@ export const adminProductColumns = {
     active: products.active,
     defaultCapacity: products.defaultCapacity,
     defaultWalkInQuantity: products.defaultWalkInQuantity,
+    version: productVersion,
 };
 
 /** Every product, inactive ones included: active first, then by name. */
