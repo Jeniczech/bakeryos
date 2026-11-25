@@ -9,8 +9,9 @@ const SelectedDate = ({ date }: { date: string | undefined }) => {
     }
     return (
         <div className="flex flex-col gap-4">
-            {/* Uncached and time-dependent; streams in after the cached catalog. */}
-            <Suspense fallback={null}>
+            {/* Uncached and time-dependent; streams in after the cached catalog. Keyed by date so
+                a switch can show the prefetched catalog without waiting for this. */}
+            <Suspense key={date} fallback={null}>
                 <PickupDateStatus pickupDate={date} />
             </Suspense>
             {/* Keyed by date so each switch mounts a new boundary and shows the fallback. */}
