@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+    canSubmitCart,
     cartReducer,
+    cartStateReducer,
+    countFlaggedLines,
     getQuantityLimit,
+    isCartFromOtherDate,
     reviewCart,
     type Cart,
+    type CartState,
     type CartProduct,
     type LiveProduct,
 } from '@/lib/cart/cart';
@@ -132,5 +137,56 @@ describe('reviewCart', () => {
             line: { quantity: 5 },
         });
         expect(review.total).toBe(5 * 6500);
+    });
+});
+
+describe('canSubmitCart', () => {
+    const live = (product: CartProduct): LiveProduct => ({ ...product, unitPrice: 5000 });
+
+    it('allows a non-empty cart without flagged lines', () => {
+        const review = reviewCart(setQuantity([], bread, 2), [live(bread)]);
+        expect(countFlaggedLines(review.lines)).toBe(0);
+        expect(canSubmitCart(review)).toBe(true);
+    });
+
+    it('refuses an empty cart', () => {
+        expect(canSubmitCart(reviewCart([], [live(bread)]))).toBe(false);
+    });
+
+    it('refuses a cart with lines not offered or above availability', () => {
+        const cart = setQuantity(setQuantity([], bread, 5), roll, 1);
+        const review = reviewCart(cart, [live({ ...bread, availableQuantity: 2 })]);
+        expect(countFlaggedLines(review.lines)).toBe(2);
+        expect(canSubmitCart(review)).toBe(false);
+    });
+});
+
+describe('cartStateReducer', () => {
+    const empty: CartState = { cart: [], editedForDate: null };
+    const edit = (state: CartState, quantity: number, pickupDate: string | null): CartState =>
+        cartStateReducer(state, { type: 'setQuantity', product: bread, quantity, pickupDate });
+
+    it('stamps edits with the selected date', () => {
+        expect(edit(empty, 1, '2026-11-26').editedForDate).toBe('2026-11-26');
+    });
+
+    it('keeps the previous date for edits without a selected date', () => {
+        const state = edit(edit(empty, 2, '2026-11-26'), 1, null);
+        expect(state).toEqual({
+            cart: [{ ...state.cart[0], quantity: 1 }],
+            editedForDate: '2026-11-26',
+        });
+    });
+
+    it('ignores refused edits, keeping the date', () => {
+        const state = edit(empty, 1, '2026-11-26');
+        expect(edit(state, 11, '2026-11-27')).toBe(state);
+    });
+
+    it('reports a cart edited on another date', () => {
+        const state = edit(empty, 1, '2026-11-26');
+        expect(isCartFromOtherDate(state, '2026-11-27')).toBe(true);
+        expect(isCartFromOtherDate(state, '2026-11-26')).toBe(false);
+        expect(isCartFromOtherDate(edit(state, 0, '2026-11-26'), '2026-11-27')).toBe(false);
     });
 });

@@ -18,5 +18,5 @@ export const LiveCartSummary = async ({ pickupDate }: { pickupDate: string }) =>
                   })),
               }
             : live;
-    return <CartSummary catalog={catalog} />;
+    return <CartSummary catalog={catalog} pickupDate={pickupDate} />;
 };

@@ -1,3 +1,4 @@
+import type { CalendarDate } from '@/lib/date-time/prague';
 import { findOnlineQuantityLimitViolation } from '@/lib/validation/reservation';
 
 /**
@@ -114,3 +115,35 @@ export const reviewCart = (
     }
     return { lines, units, total };
 };
+
+/** Lines that cannot be reserved as they are on the selected date. */
+export const countFlaggedLines = (lines: readonly ReviewedCartLine[]): number =>
+    lines.filter((reviewed) => reviewed.issue !== null).length;
+
+/**
+ * Whether a reviewed cart may be submitted: not empty and nothing flagged. A UX guard only; the
+ * server checks everything again at submission.
+ */
+export const canSubmitCart = (review: { lines: readonly ReviewedCartLine[] }): boolean =>
+    review.lines.length > 0 && countFlaggedLines(review.lines) === 0;
+
+/**
+ * The cart with the pickup date it was last edited on, so a date switch can tell the customer
+ * that the cart was checked again for the new date.
+ */
+export type CartState = { cart: Cart; editedForDate: CalendarDate | null };
+
+/** `pickupDate` is `null` where no date is selected; edits there keep the previous date. */
+export type DatedCartAction = CartAction & { pickupDate: CalendarDate | null };
+
+export const cartStateReducer = (state: CartState, action: DatedCartAction): CartState => {
+    const cart = cartReducer(state.cart, action);
+    if (cart === state.cart) {
+        return state;
+    }
+    return { cart, editedForDate: action.pickupDate ?? state.editedForDate };
+};
+
+/** Whether the cart has items and was last edited on a different date than `pickupDate`. */
+export const isCartFromOtherDate = (state: CartState, pickupDate: CalendarDate): boolean =>
+    state.cart.length > 0 && state.editedForDate !== null && state.editedForDate !== pickupDate;

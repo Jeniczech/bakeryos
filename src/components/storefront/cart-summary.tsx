@@ -1,9 +1,17 @@
 'use client';
 
 import { useId } from 'react';
-import { reviewCart, type LiveProduct, type ReviewedCartLine } from '@/lib/cart/cart';
+import { Notice } from '@/components/ui/notice';
+import {
+    countFlaggedLines,
+    isCartFromOtherDate,
+    reviewCart,
+    type LiveProduct,
+    type ReviewedCartLine,
+} from '@/lib/cart/cart';
+import { formatLongDate } from '@/lib/formatting/dates';
 import { formatPrice } from '@/lib/formatting/money';
-import { useCart } from './cart-provider';
+import { useCart, useCartEditor } from './cart-provider';
 import { QuantityStepper } from './quantity-stepper';
 
 /** The selected date's live catalog, as far as the cart needs it. */
@@ -18,6 +26,21 @@ const CATALOG_STATUS_MESSAGES: Record<Exclude<CartCatalog['status'], 'open'>, st
     closed: 'Na vybraný den už rezervace nepřijímáme. Vyberte prosím jiný den.',
     failed: 'Ceny a dostupnost se nepodařilo načíst. Zkuste stránku obnovit.',
 };
+
+/** Shown after a date switch, so changed prices and flagged lines do not go unnoticed. */
+const DateChangeNotice = ({
+    pickupDate,
+    flaggedLines,
+}: {
+    pickupDate: string;
+    flaggedLines: number;
+}) => (
+    <Notice tone={flaggedLines > 0 ? 'warning' : 'info'}>
+        Košík jsme přepočítali pro nově vybraný den ({formatLongDate(pickupDate)}).
+        {flaggedLines > 0 &&
+            ' Některé položky na tento den nelze rezervovat v požadovaném množství. Upravte je prosím.'}
+    </Notice>
+);
 
 const CartLineIssueMessage = ({ reviewed }: { reviewed: ReviewedCartLine }) => {
     if (reviewed.issue === 'NOT_OFFERED') {
@@ -36,13 +59,15 @@ const CartLineIssueMessage = ({ reviewed }: { reviewed: ReviewedCartLine }) => {
 };
 
 const CartLineItem = ({
+    pickupDate,
     reviewed,
     showPrices,
 }: {
+    pickupDate: string | null;
     reviewed: ReviewedCartLine;
     showPrices: boolean;
 }) => {
-    const { dispatch } = useCart();
+    const { dispatch } = useCartEditor(pickupDate);
     const { line, product } = reviewed;
     const name = product?.name ?? line.name;
     return (
@@ -68,6 +93,7 @@ const CartLineItem = ({
             <div className="flex items-center justify-between gap-3">
                 {/* Without a live product nothing can be added; decreasing always works. */}
                 <QuantityStepper
+                    pickupDate={pickupDate}
                     product={{
                         productId: line.productId,
                         name,
@@ -94,8 +120,16 @@ const CartLineItem = ({
  * empty state in the large-screen sidebar, so adding the first product does not shift the
  * layout.
  */
-export const CartSummary = ({ catalog }: { catalog: CartCatalog }) => {
-    const { cart } = useCart();
+export const CartSummary = ({
+    catalog,
+    pickupDate,
+}: {
+    catalog: CartCatalog;
+    /** `null` while no date is selected or the date is still loading. */
+    pickupDate: string | null;
+}) => {
+    const cartState = useCart();
+    const { cart } = cartState;
     // Unique per instance: Next keeps the previous page's cart mounted, hidden, for back navigation.
     const headingId = useId();
     if (cart.length === 0) {
@@ -113,6 +147,9 @@ export const CartSummary = ({ catalog }: { catalog: CartCatalog }) => {
     }
     const isOpen = catalog.status === 'open';
     const review = reviewCart(cart, isOpen ? catalog.products : []);
+    // The cart is empty when rendered on the server, so formatting the date cannot mismatch.
+    const showDateChange =
+        isOpen && pickupDate !== null && isCartFromOtherDate(cartState, pickupDate);
     return (
         <section
             aria-labelledby={headingId}
@@ -121,10 +158,17 @@ export const CartSummary = ({ catalog }: { catalog: CartCatalog }) => {
             <h2 id={headingId} className="text-lg font-semibold text-amber-950">
                 Košík
             </h2>
+            {showDateChange && (
+                <DateChangeNotice
+                    pickupDate={pickupDate}
+                    flaggedLines={countFlaggedLines(review.lines)}
+                />
+            )}
             <ul className="flex flex-col divide-y divide-amber-100">
                 {review.lines.map((reviewed) => (
                     <CartLineItem
                         key={reviewed.line.productId}
+                        pickupDate={pickupDate}
                         reviewed={reviewed}
                         showPrices={isOpen}
                     />

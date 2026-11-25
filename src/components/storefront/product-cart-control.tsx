@@ -1,16 +1,30 @@
 'use client';
 
 import { getCartQuantity, getQuantityLimit, type CartProduct } from '@/lib/cart/cart';
-import { useCart } from './cart-provider';
+import { useCartEditor } from './cart-provider';
 import { CART_CONTROL_ROW_CLASSES, LimitHint } from './limit-hint';
 import { QuantityStepper } from './quantity-stepper';
 
 /** Adds a catalog product to the cart, then lets the customer adjust its quantity. */
-export const ProductCartControl = ({ product }: { product: CartProduct }) => {
-    const { cart, dispatch } = useCart();
+export const ProductCartControl = ({
+    pickupDate,
+    product,
+}: {
+    pickupDate: string;
+    product: CartProduct;
+}) => {
+    const { cart, dispatch } = useCartEditor(pickupDate);
     const quantity = getCartQuantity(cart, product.productId);
     if (quantity > 0) {
-        return <QuantityStepper product={product} quantity={quantity} showLimit announce={false} />;
+        return (
+            <QuantityStepper
+                pickupDate={pickupDate}
+                product={product}
+                quantity={quantity}
+                showLimit
+                announce={false}
+            />
+        );
     }
     if (product.availableQuantity === 0) {
         return null;

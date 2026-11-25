@@ -3,7 +3,7 @@ import { CartSummary } from '@/components/storefront/cart-summary';
 import { Notice } from '@/components/ui/notice';
 
 const OrderPage = () => (
-    <CartColumns cart={<CartSummary catalog={{ status: 'noDate' }} />}>
+    <CartColumns cart={<CartSummary catalog={{ status: 'noDate' }} pickupDate={null} />}>
         <Notice>Vyberte den vyzvednutí a ukážeme vám, co si můžete rezervovat.</Notice>
     </CartColumns>
 );
