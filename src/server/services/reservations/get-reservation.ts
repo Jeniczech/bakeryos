@@ -3,8 +3,8 @@ import { getDb, type DbExecutor } from '@/server/db/client';
 import { reservationItems, reservations } from '@/server/db/schema';
 import { ReservationNotFoundError } from '@/server/domain/errors';
 import {
-    getOnlineCutoff,
-    isBeforeOnlineCutoff,
+    getReservationCutoff,
+    isBeforeReservationCutoff,
     type ReservationStatus,
 } from '@/server/domain/reservation-rules';
 import { compareConfirmationItems, type ReservationConfirmationItem } from './create-reservation';
@@ -65,9 +65,10 @@ const loadDetails = async (
         customerName: reservation.customerName,
         totalPrice: items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
         items: items.sort(compareConfirmationItems),
-        cancellationCutoff: getOnlineCutoff(reservation.pickupDate),
+        cancellationCutoff: getReservationCutoff(reservation.pickupDate),
         canCancel:
-            reservation.status === 'confirmed' && isBeforeOnlineCutoff(reservation.pickupDate, now),
+            reservation.status === 'confirmed' &&
+            isBeforeReservationCutoff(reservation.pickupDate, now),
     };
 };
 

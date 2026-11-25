@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { Suspense } from 'react';
 import { Notice } from '@/components/ui/notice';
 import { formatLongDate, formatPragueDateTime } from '@/lib/formatting/dates';
-import { getOnlineCutoff } from '@/server/domain/reservation-rules';
+import { getReservationCutoff } from '@/server/domain/reservation-rules';
 import { getPickupDates } from '@/server/services/eligibility';
 import { getOfferedProducts } from '@/server/services/products/get-offered-products';
 import { ProductAvailability, ProductAvailabilitySkeleton } from './product-availability';
@@ -18,7 +18,7 @@ const getCachedBookableDates = async (): Promise<string[]> => {
     // `expire` of 5 minutes is the shortest that still keeps the result in prefetches.
     cacheLife({ stale: 300, revalidate: 60, expire: 300 });
     cacheTag('catalog');
-    const dates = await getPickupDates('online', new Date());
+    const dates = await getPickupDates(new Date());
     return dates.filter((option) => option.unavailableReason === null).map(({ date }) => date);
 };
 
@@ -51,7 +51,7 @@ export const ProductCatalog = async ({ pickupDate }: { pickupDate: string }) => 
                     Nabídka na vyzvednutí: {formatLongDate(pickupDate)}
                 </h2>
                 <p className="text-sm text-stone-600">
-                    Uzávěrka objednávek: {formatPragueDateTime(getOnlineCutoff(pickupDate))}
+                    Uzávěrka objednávek: {formatPragueDateTime(getReservationCutoff(pickupDate))}
                 </p>
             </div>
             {products.length === 0 ? (

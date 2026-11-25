@@ -63,7 +63,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Seed bakery schedule, sample products, and one administrator.
 - [x] Implement pure availability and recommended-production functions.
 - [x] Implement cutoff calculation in `Europe/Prague`.
-- [x] Implement reservation state-transition and date/product eligibility rules, including online (`today+1..today+7`) and admin (`today..today+7`) booking windows.
+- [x] Implement reservation state-transition and date/product eligibility rules, including the booking window (`today+1..today+7`, every source) and the daily-plan planning window (`today..today+7`).
 - [x] Implement online quantity limits and phone normalization (Zod).
 - [x] Add Vitest unit tests.
 
@@ -85,7 +85,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Implement deterministic multi-product `SELECT ... FOR UPDATE` locking.
 - [x] Implement committed-quantity aggregation after locks.
 - [x] Implement `createReservation()` with trusted `online`/`admin` source.
-- [x] Apply cutoff only to online source; never bypass capacity.
+- [x] Apply cutoff to every source; never bypass capacity.
 - [x] Implement idempotency key, canonical request hash, and unique-conflict replay handling.
 - [x] Implement deterministic HMAC management token derivation and stored token hash.
 - [x] Implement `updateDailyPlan()` with the same locking protocol.
@@ -99,7 +99,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - Same idempotency key/payload returns the original confirmation and management link.
 - Same key/different payload returns conflict.
 - Concurrent capacity reduction cannot violate existing commitments.
-- Admin can book after cutoff if capacity exists, but never for a past date.
+- Admin bookings follow the same window and cutoff as online and never exceed capacity.
 
 **Mandatory review checkpoint:** Inspect transaction boundaries, lock order, re-reads after locking, and final DB assertions before moving on.
 
@@ -162,7 +162,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Add PostgreSQL-backed rate limiting to login attempts.
 - [ ] Protect server-side reads and **every** admin Server Action.
 - [x] Build reservation list filtered by pickup date.
-- [ ] Build manual phone reservation form using `createReservation()` with trusted `admin` source.
+- [x] Build manual phone reservation form using `createReservation()` with trusted `admin` source.
 - [x] Implement picked-up, cancelled, and no-show actions with valid transitions.
 - [ ] Build product create/edit/deactivate forms.
 - [ ] Invalidate the `catalog` cache tag on product, weekday, opening-day and closure changes.
@@ -172,8 +172,8 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 ### Acceptance criteria
 
 - Unauthenticated users cannot read or mutate admin data.
-- Admin can create a reservation after cutoff while respecting capacity.
-- Admin cannot create a reservation for a past date.
+- Admin can create a reservation before cutoff while respecting capacity.
+- Admin cannot create a reservation after cutoff, for today, or for a past date.
 - All admin mutations reuse the same application services and locking rules.
 - Late cancellations remain committed to production.
 - Product deactivation preserves historical reservations.
@@ -188,7 +188,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [ ] Test competing reservations for the last unit using independent DB connections and controlled overlap.
 - [ ] Test overlapping multi-product requests.
 - [ ] Test same/different payload idempotency replay.
-- [ ] Test early/late cancellation and admin cutoff bypass.
+- [ ] Test early/late cancellation and admin cutoff enforcement.
 - [ ] Test concurrent capacity edits and status changes.
 - [ ] Test first-write daily-plan snapshots.
 - [ ] Implement one Playwright customer flow: date → cart → checkout → confirmation → management → cancellation.
@@ -238,7 +238,7 @@ Be ready to explain:
 - Why daily product plans are locked with PostgreSQL row-level locks.
 - Why reservation creation is idempotent.
 - Why a late cancellation remains a production commitment.
-- Why admin phone orders can bypass cutoff but cannot bypass capacity.
+- Why phone orders follow the same cutoff as online orders (production is planned at the cutoff).
 - Why product name/price snapshots are stored on reservation items.
 - Why this is a monolith rather than separate services.
 - Why a custom admin was chosen instead of Payload CMS.

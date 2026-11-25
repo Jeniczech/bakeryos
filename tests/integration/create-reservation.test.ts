@@ -333,52 +333,60 @@ describe('createReservation', () => {
     });
 
     describe('admin rules', () => {
-        const AFTER_CUTOFF = new Date(CUTOFF.getTime() + 3 * 60 * 60 * 1000);
-
-        it('may book after the cutoff and for today, without online quantity limits', async () => {
+        it('has no online quantity limits', async () => {
             const bread = await insertProduct({ defaultCapacity: 40 });
 
-            await expect(
-                createReservation(
-                    buildInput([{ productId: bread.id, quantity: 25 }], { source: 'admin' }),
-                    { now: AFTER_CUTOFF },
-                ),
-            ).resolves.toMatchObject({ status: 'confirmed' });
-            const sameDay = await createReservation(
-                buildInput([{ productId: bread.id, quantity: 15 }], { source: 'admin' }),
-                { now: pragueTimeToInstant(PICKUP_DATE, 9) },
+            const result = await createReservation(
+                buildInput([{ productId: bread.id, quantity: 25 }], { source: 'admin' }),
+                { now: BEFORE_CUTOFF },
             );
 
             const [stored] = await getDb()
                 .select({ source: reservations.source })
                 .from(reservations)
-                .where(eq(reservations.id, sameDay.reservationId));
+                .where(eq(reservations.id, result.reservationId));
             expect(stored.source).toBe('admin');
         });
 
-        it('never bypasses capacity after the cutoff', async () => {
+        it('rejects the pickup date at the cutoff, like an online reservation', async () => {
+            const bread = await insertProduct();
+
+            await expect(
+                createReservation(
+                    buildInput([{ productId: bread.id, quantity: 1 }], { source: 'admin' }),
+                    { now: CUTOFF },
+                ),
+            ).rejects.toMatchObject({ code: 'CUTOFF_PASSED' });
+            expect(await readReservations([bread.id])).toHaveLength(0);
+        });
+
+        it.each([
+            ['on the pickup date', pragueTimeToInstant(PICKUP_DATE, 9)],
+            ['after the pickup date', pragueTimeToInstant('2099-05-14', 8)],
+        ])('rejects a booking %s', async (_label, now) => {
+            const bread = await insertProduct();
+
+            await expect(
+                createReservation(
+                    buildInput([{ productId: bread.id, quantity: 1 }], { source: 'admin' }),
+                    { now },
+                ),
+            ).rejects.toMatchObject({ code: 'OUTSIDE_BOOKING_WINDOW' });
+            expect(await readReservations([bread.id])).toHaveLength(0);
+        });
+
+        it('never bypasses capacity', async () => {
             const bread = await insertProduct({ defaultCapacity: 5, defaultWalkInQuantity: 2 });
 
             const attempt = createReservation(
                 buildInput([{ productId: bread.id, quantity: 4 }], { source: 'admin' }),
-                { now: AFTER_CUTOFF },
+                { now: BEFORE_CUTOFF },
             );
             await expect(attempt).rejects.toMatchObject({
                 code: 'INSUFFICIENT_CAPACITY',
                 shortages: [{ productId: bread.id, requested: 4, available: 3 }],
             });
             expect(await readReservations([bread.id])).toHaveLength(0);
-        });
-
-        it('rejects a past pickup date', async () => {
-            const bread = await insertProduct();
-
-            await expect(
-                createReservation(
-                    buildInput([{ productId: bread.id, quantity: 1 }], { source: 'admin' }),
-                    { now: pragueTimeToInstant('2099-05-14', 8) },
-                ),
-            ).rejects.toMatchObject({ code: 'OUTSIDE_BOOKING_WINDOW' });
         });
     });
 

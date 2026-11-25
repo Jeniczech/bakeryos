@@ -206,7 +206,7 @@ const createInTransaction = async (
     }
 
     // Rejects ineligible dates and products before materializing or locking any plan.
-    await assertPickupDateAvailable(tx, request.pickupDate, source, getNow());
+    await assertPickupDateAvailable(tx, request.pickupDate, getNow());
     const productIds = request.items.map((item) => item.productId);
     await loadOfferedProducts(tx, productIds, request.pickupDate);
     const plans = await lockDailyPlans(tx, request.pickupDate, productIds);
@@ -218,7 +218,7 @@ const createInTransaction = async (
     }
     // Re-check after locking so eligibility and the price/name snapshots are current, with
     // the clock read again: the lock wait may cross the cutoff.
-    await assertPickupDateAvailable(tx, request.pickupDate, source, getNow());
+    await assertPickupDateAvailable(tx, request.pickupDate, getNow());
     const offered = await loadOfferedProducts(tx, productIds, request.pickupDate);
     const committed = await getCommittedQuantities(tx, request.pickupDate, productIds);
     assertCapacity(request.items, plans, committed);
@@ -294,8 +294,8 @@ const createValidated = async (
 /**
  * Creates a confirmed reservation for every item or none, following the locking protocol
  * (TDD §6): idempotency check, eligibility, plan locks in product-ID order, then capacity
- * from committed quantities read after locking. The online cutoff and quantity limits apply
- * only to `online`; capacity applies to every source. `now` is injectable for tests and
+ * from committed quantities read after locking. The booking window, cutoff and capacity apply
+ * to every source; the quantity limits only to `online`. `now` is injectable for tests and
  * otherwise read at each check.
  */
 export const createReservation = async (

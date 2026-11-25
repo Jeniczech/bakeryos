@@ -3,7 +3,7 @@ import { getDb, type DbExecutor } from '@/server/db/client';
 import { getCommittedQuantities } from '@/server/db/committed-quantities';
 import { dailyProductPlans } from '@/server/db/schema';
 import { getRemainingAvailability } from '@/server/domain/availability';
-import { getOnlineCutoff } from '@/server/domain/reservation-rules';
+import { getReservationCutoff } from '@/server/domain/reservation-rules';
 import { assertPickupDateAvailable } from '../eligibility';
 import { listOfferedProducts, type CatalogProduct } from './get-offered-products';
 
@@ -68,18 +68,18 @@ export const listAvailableProducts = async (
 };
 
 /**
- * The online catalog for a pickup date, rejecting dates that cannot be booked online now.
- * `createReservation` rechecks everything transactionally. `now` is injectable for tests.
+ * The catalog for a pickup date, rejecting dates that cannot be booked now. `createReservation`
+ * rechecks everything transactionally. `now` is injectable for tests.
  */
 export const getAvailableProducts = async (
     pickupDate: string,
     options: { now?: Date } = {},
 ): Promise<ProductCatalog> => {
     const db = getDb();
-    await assertPickupDateAvailable(db, pickupDate, 'online', options.now ?? new Date());
+    await assertPickupDateAvailable(db, pickupDate, options.now ?? new Date());
     return {
         pickupDate,
-        orderingCutoff: getOnlineCutoff(pickupDate),
+        orderingCutoff: getReservationCutoff(pickupDate),
         products: await listAvailableProducts(db, pickupDate),
     };
 };

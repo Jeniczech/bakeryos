@@ -14,11 +14,7 @@ import {
     toValidationIssues,
 } from '@/server/domain/errors';
 import { buildDailyProductionItem, type DailyProductionItem } from '@/server/domain/production';
-import {
-    assertPickupDateAvailable,
-    loadOfferedProducts,
-    type OfferedProduct,
-} from '../eligibility';
+import { assertPlanDateAvailable, loadOfferedProducts, type OfferedProduct } from '../eligibility';
 
 export type UpdateDailyPlanInput = {
     productId: string;
@@ -40,7 +36,7 @@ const parseInput = (input: UpdateDailyPlanInput): DailyPlanUpdate => {
 
 /**
  * Past plans are production history; editing them would rewrite what was planned. Beyond
- * that, the date must be in the admin booking window and open, and the product offered.
+ * that, the date must be in the planning window and open, and the product offered.
  */
 const assertPlanEditable = async (
     tx: Transaction,
@@ -53,7 +49,7 @@ const assertPlanEditable = async (
             'The daily plan update is invalid.',
         );
     }
-    await assertPickupDateAvailable(tx, update.date, 'admin', now);
+    await assertPlanDateAvailable(tx, update.date, now);
     try {
         const [product] = await loadOfferedProducts(tx, [update.productId], update.date);
         return product;
