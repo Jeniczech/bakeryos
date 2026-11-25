@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { unstable_rethrow } from 'next/navigation';
 import { connection } from 'next/server';
 import { Suspense } from 'react';
 import { ReservationCancellation } from '@/components/storefront/reservation-cancellation';
@@ -8,6 +9,7 @@ import { SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
 import { formatLongDate, formatPragueDateTime } from '@/lib/formatting/dates';
 import { ReservationNotFoundError } from '@/server/domain/errors';
+import { describeForLog } from '@/server/http/problem-details';
 import {
     getReservationByToken,
     type ReservationDetails,
@@ -69,6 +71,7 @@ const ManagedReservation = async ({
     try {
         details = await getReservationByToken(token);
     } catch (error) {
+        unstable_rethrow(error);
         if (error instanceof ReservationNotFoundError) {
             return (
                 <div className="flex flex-col items-start gap-4">
@@ -82,7 +85,9 @@ const ManagedReservation = async ({
                 </div>
             );
         }
-        throw error;
+        // Query errors carry the token hash as a parameter. Next logs the thrown error with its
+        // digest, so the sanitized cause appears in the same log entry.
+        throw new Error('The reservation could not be loaded.', { cause: describeForLog(error) });
     }
     const { heading, cancellationNote } = describeReservation(details);
     return (

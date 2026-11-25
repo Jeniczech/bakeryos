@@ -1,3 +1,4 @@
+import { DrizzleQueryError } from 'drizzle-orm/errors';
 import { findPgError } from '@/server/db/errors';
 import {
     DomainError,
@@ -104,9 +105,9 @@ export const mapDomainError = (error: DomainError): Problem | null => {
 
 /**
  * Database error messages can carry query parameters (idempotency keys, token hashes), so
- * only the error class and PostgreSQL code are logged for them.
+ * only the error class and PostgreSQL code, or the underlying cause, are logged for them.
  */
-const describeForLog = (error: unknown): unknown => {
+export const describeForLog = (error: unknown): unknown => {
     const pgError = findPgError(error);
     if (pgError) {
         return {
@@ -114,6 +115,10 @@ const describeForLog = (error: unknown): unknown => {
             pgCode: pgError.code,
             constraint: pgError.constraint,
         };
+    }
+    // A failed query without a PostgreSQL code (e.g. a connection timeout) still lists its params.
+    if (error instanceof DrizzleQueryError) {
+        return { name: error.name, cause: error.cause?.message };
     }
     return error;
 };

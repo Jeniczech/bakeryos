@@ -1,3 +1,4 @@
+import { DrizzleQueryError } from 'drizzle-orm/errors';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     DomainError,
@@ -80,6 +81,17 @@ describe('errorResponse', () => {
 
         expect(JSON.stringify(log.mock.calls)).not.toContain('secret');
         expect(log.mock.calls[0][1]).toMatchObject({ pgCode: '23505' });
+    });
+
+    it('logs a failed query without a PostgreSQL code without its params', () => {
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const timeout = new Error('Connection terminated due to connection timeout');
+        const failed = new DrizzleQueryError('select … where token_hash = $1', ['secret'], timeout);
+
+        errorResponse(failed, 'test');
+
+        expect(JSON.stringify(log.mock.calls)).not.toContain('secret');
+        expect(log.mock.calls[0][1]).toMatchObject({ cause: timeout.message });
     });
 });
 

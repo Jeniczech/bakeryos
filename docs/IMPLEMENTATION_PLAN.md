@@ -141,7 +141,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Submit with a stable idempotency key and pending state.
 - [x] Build confirmation screen with reservation number and management link.
 - [x] Build reservation-management/cancellation screen.
-- [ ] Add loading, empty, error, and capacity-conflict states.
+- [x] Add loading, empty, error, and capacity-conflict states.
 - [x] Revalidate cart on date changes without silently editing it.
 
 ### Acceptance criteria

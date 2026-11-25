@@ -1,3 +1,4 @@
+import { unstable_rethrow } from 'next/navigation';
 import { connection } from 'next/server';
 import { Suspense } from 'react';
 import { CartProvider } from '@/components/storefront/cart-provider';
@@ -10,11 +11,24 @@ import {
 import { getOnlinePickupDates } from '@/components/storefront/pickup-date-status';
 import { Notice } from '@/components/ui/notice';
 import { formatShortDate } from '@/lib/formatting/dates';
+import type { PickupDateOption } from '@/server/domain/reservation-rules';
 
 const PickupDates = async () => {
     // The window and cutoff depend on the current time, so the dates are never cached.
     await connection();
-    const dates = await getOnlinePickupDates();
+    let dates: PickupDateOption[];
+    try {
+        dates = await getOnlinePickupDates();
+    } catch (error) {
+        unstable_rethrow(error);
+        // Handled here: the storefront error boundary would unmount the cart and contact details.
+        console.error('Failed to load pickup dates', error);
+        return (
+            <Notice tone="warning">
+                Dny vyzvednutí se nepodařilo načíst. Zkuste prosím stránku za chvíli obnovit.
+            </Notice>
+        );
+    }
     // Formatted here so the browser's Intl data cannot cause hydration mismatches.
     const choices: PickupDateChoice[] = dates.map(({ date, unavailableReason }) => ({
         date,
