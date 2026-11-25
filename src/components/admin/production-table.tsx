@@ -1,18 +1,22 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import {
     updateDailyPlanAction,
     type DailyPlanField,
     type DailyPlanFormState,
 } from '@/app/admin/(dashboard)/production/actions';
 import { SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
-import type { DailyProductionRow } from '@/server/services/production/get-daily-production';
+import type {
+    DailyProductionRow,
+    ProductionRowNotice,
+} from '@/server/services/production/get-daily-production';
 
 const INITIAL_STATE: DailyPlanFormState = {
     error: null,
     fields: [],
     committedQuantity: null,
+    currentPlan: null,
     values: null,
     saved: false,
 };
@@ -25,6 +29,8 @@ const errorMessage = (state: DailyPlanFormState): string | null => {
             return 'Zadejte celá nezáporná čísla; pultový prodej nesmí převýšit kapacitu.';
         case 'BELOW_COMMITMENTS':
             return `Kapacita musí pokrýt pultový prodej a ${state.committedQuantity} už rezervovaných kusů.`;
+        case 'CHANGED':
+            return `Plán mezitím někdo změnil (kapacita ${state.currentPlan?.capacity}, pultový prodej ${state.currentPlan?.walkInQuantity}). Zkontrolujte hodnoty a uložte znovu.`;
         case 'DATE_UNAVAILABLE':
             return 'Plán pro tento den už nelze měnit.';
         case 'PRODUCT_UNAVAILABLE':
@@ -32,6 +38,11 @@ const errorMessage = (state: DailyPlanFormState): string | null => {
         case 'UNAVAILABLE':
             return 'Plán se nepodařilo uložit. Zkuste to prosím znovu.';
     }
+};
+
+const NOTICE_LABELS: Record<ProductionRowNotice, string> = {
+    INACTIVE: 'neaktivní',
+    NOT_OFFERED_ON_DATE: 'v tento den mimo nabídku',
 };
 
 const INPUT_CLASSES =
@@ -45,12 +56,14 @@ const QuantityInput = ({
     formId,
     defaultValue,
     state,
+    onChange,
 }: {
     field: DailyPlanField;
     label: string;
     formId: string;
     defaultValue: string;
     state: DailyPlanFormState;
+    onChange: () => void;
 }) => (
     <input
         form={formId}
@@ -62,6 +75,7 @@ const QuantityInput = ({
         required
         aria-label={label}
         defaultValue={defaultValue}
+        onChange={onChange}
         aria-invalid={state.fields.includes(field) || undefined}
         aria-describedby={state.error ? `${formId}-error` : undefined}
         className={INPUT_CLASSES}
@@ -85,45 +99,64 @@ const ResultCells = ({ row }: { row: DailyProductionRow }) => (
 const ProductCell = ({ row }: { row: DailyProductionRow }) => (
     <th scope="row" className="px-4 py-3 text-left font-medium">
         {row.productName}
-        {!row.active && <span className="ml-2 text-xs font-normal">(neaktivní)</span>}
+        {row.notice && (
+            <span className="ml-2 text-xs font-normal">({NOTICE_LABELS[row.notice]})</span>
+        )}
     </th>
 );
 
 /**
  * Inputs sit in their own cells and join the row's form through the `form` attribute, since a
- * form cannot wrap a table row.
+ * form cannot wrap a table row. The form also sends the stored values the inputs started
+ * from, so the server rejects the save if someone changed the plan in the meantime; the
+ * inputs are keyed on those values, so they start over whenever the stored plan changes.
  */
 const EditableRow = ({ row, date }: { row: DailyProductionRow; date: string }) => {
     const [state, formAction, pending] = useActionState(updateDailyPlanAction, INITIAL_STATE);
+    // Hides "Uloženo" once the inputs differ from what was saved.
+    const [editedSinceSubmit, setEditedSinceSubmit] = useState(false);
+    const markEdited = () => setEditedSinceSubmit(true);
     const formId = `plan-${row.productId}`;
+    const storedPlanKey = `${row.capacity}:${row.walkInQuantity}`;
     const message = errorMessage(state);
     return (
         <tr>
             <ProductCell row={row} />
             <td className={CELL}>
                 <QuantityInput
+                    key={storedPlanKey}
                     field="capacity"
                     label={`Kapacita – ${row.productName}`}
                     formId={formId}
                     defaultValue={state.values?.capacity ?? String(row.capacity)}
                     state={state}
+                    onChange={markEdited}
                 />
             </td>
             <SharedCells row={row} />
             <td className={CELL}>
                 <QuantityInput
+                    key={storedPlanKey}
                     field="walkInQuantity"
                     label={`Pultový prodej – ${row.productName}`}
                     formId={formId}
                     defaultValue={state.values?.walkInQuantity ?? String(row.walkInQuantity)}
                     state={state}
+                    onChange={markEdited}
                 />
             </td>
             <ResultCells row={row} />
             <td className="px-4 py-3">
-                <form id={formId} action={formAction} className="flex flex-col items-end gap-1">
+                <form
+                    id={formId}
+                    action={formAction}
+                    onSubmit={() => setEditedSinceSubmit(false)}
+                    className="flex flex-col items-end gap-1"
+                >
                     <input type="hidden" name="productId" value={row.productId} />
                     <input type="hidden" name="date" value={date} />
+                    <input type="hidden" name="expectedCapacity" value={row.capacity} />
+                    <input type="hidden" name="expectedWalkInQuantity" value={row.walkInQuantity} />
                     <button type="submit" disabled={pending} className={SECONDARY_BUTTON_CLASSES}>
                         Uložit<span className="sr-only"> {row.productName}</span>
                     </button>
@@ -136,7 +169,7 @@ const EditableRow = ({ row, date }: { row: DailyProductionRow; date: string }) =
                             {message}
                         </p>
                     )}
-                    {state.saved && !pending && (
+                    {state.saved && !pending && !editedSinceSubmit && (
                         <p role="status" className="text-sm text-green-800">
                             Uloženo
                         </p>
@@ -148,7 +181,7 @@ const EditableRow = ({ row, date }: { row: DailyProductionRow; date: string }) =
 };
 
 const ReadOnlyRow = ({ row }: { row: DailyProductionRow }) => (
-    <tr className={row.active ? undefined : 'text-stone-500'}>
+    <tr className={row.notice ? 'text-stone-500' : undefined}>
         <ProductCell row={row} />
         <td className={CELL}>{row.capacity}</td>
         <SharedCells row={row} />

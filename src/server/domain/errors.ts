@@ -111,6 +111,20 @@ export class PlanBelowCommitmentsError extends DomainError {
     }
 }
 
+export type PlanQuantitiesSnapshot = { capacity: number; walkInQuantity: number };
+
+/** The daily plan no longer has the values the editor loaded; carries the current ones. */
+export class PlanChangedError extends DomainError {
+    readonly code = 'PLAN_CHANGED';
+
+    constructor(
+        readonly productId: string,
+        readonly current: PlanQuantitiesSnapshot,
+    ) {
+        super('The daily plan was changed in the meantime.');
+    }
+}
+
 /** The product was saved by someone else since the editor loaded it. */
 export class ProductChangedError extends DomainError {
     readonly code = 'PRODUCT_CHANGED';

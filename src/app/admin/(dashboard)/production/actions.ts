@@ -6,6 +6,7 @@ import {
     InvalidRequestError,
     PickupDateUnavailableError,
     PlanBelowCommitmentsError,
+    PlanChangedError,
     ProductNotFoundError,
     ProductUnavailableError,
 } from '@/server/domain/errors';
@@ -19,6 +20,7 @@ export type DailyPlanFormState = {
     error:
         | 'INVALID_REQUEST'
         | 'BELOW_COMMITMENTS'
+        | 'CHANGED'
         | 'DATE_UNAVAILABLE'
         | 'PRODUCT_UNAVAILABLE'
         | 'UNAVAILABLE'
@@ -26,6 +28,8 @@ export type DailyPlanFormState = {
     fields: DailyPlanField[];
     /** Set with `BELOW_COMMITMENTS`: the reserved units the capacity must still cover. */
     committedQuantity: number | null;
+    /** Set with `CHANGED`: the plan someone else saved since the form was loaded. */
+    currentPlan: { capacity: number; walkInQuantity: number } | null;
     /** What was entered, so a rejected form keeps it; `null` after a successful save. */
     values: DailyPlanFormValues | null;
     saved: boolean;
@@ -45,11 +49,12 @@ const parseWholeNumber = (value: string): number =>
 const failure = (
     error: Exclude<DailyPlanFormState['error'], null>,
     values: DailyPlanFormValues,
-    details: Partial<Pick<DailyPlanFormState, 'fields' | 'committedQuantity'>> = {},
+    details: Partial<Pick<DailyPlanFormState, 'fields' | 'committedQuantity' | 'currentPlan'>> = {},
 ): DailyPlanFormState => ({
     error,
     fields: details.fields ?? [],
     committedQuantity: details.committedQuantity ?? null,
+    currentPlan: details.currentPlan ?? null,
     values,
     saved: false,
 });
@@ -61,6 +66,9 @@ const toFailure = (error: unknown, values: DailyPlanFormValues): DailyPlanFormSt
             committedQuantity: error.committedQuantity,
         });
     }
+    if (error instanceof PlanChangedError) {
+        return failure('CHANGED', values, { currentPlan: error.current });
+    }
     if (error instanceof InvalidRequestError) {
         const fields = PLAN_FIELDS.filter((field) =>
             error.issues.some((issue) => issue.path === field),
@@ -68,10 +76,13 @@ const toFailure = (error: unknown, values: DailyPlanFormValues): DailyPlanFormSt
         if (fields.length > 0) {
             return failure('INVALID_REQUEST', values, { fields });
         }
-        // Otherwise the hidden fields were rejected: a malformed product ID, or a past date.
-        return error.issues.some((issue) => issue.path === 'productId')
-            ? failure('PRODUCT_UNAVAILABLE', values)
-            : failure('DATE_UNAVAILABLE', values);
+        // Otherwise a hidden field was rejected: a malformed product ID, or a past date.
+        if (error.issues.every((issue) => issue.path === 'productId')) {
+            return failure('PRODUCT_UNAVAILABLE', values);
+        }
+        if (error.issues.every((issue) => issue.path === 'date')) {
+            return failure('DATE_UNAVAILABLE', values);
+        }
     }
     if (error instanceof PickupDateUnavailableError) {
         return failure('DATE_UNAVAILABLE', values);
@@ -86,7 +97,9 @@ const toFailure = (error: unknown, values: DailyPlanFormValues): DailyPlanFormSt
 /**
  * Overrides one product's capacity and walk-in quantity for a date through the shared
  * `updateDailyPlan` service, which locks the plan and rejects anything below existing
- * commitments. Every outcome refreshes the page, so the table shows the current figures.
+ * commitments. The form also sends the values it was loaded with, so a save made from an
+ * outdated form is rejected instead of undoing a newer one. Every outcome refreshes the
+ * page, so the table shows the current figures.
  */
 export const updateDailyPlanAction = async (
     _previous: DailyPlanFormState,
@@ -104,8 +117,19 @@ export const updateDailyPlanAction = async (
             date: text(formData, 'date'),
             capacity: parseWholeNumber(values.capacity),
             walkInQuantity: parseWholeNumber(values.walkInQuantity),
+            expected: {
+                capacity: parseWholeNumber(text(formData, 'expectedCapacity')),
+                walkInQuantity: parseWholeNumber(text(formData, 'expectedWalkInQuantity')),
+            },
         });
-        state = { error: null, fields: [], committedQuantity: null, values: null, saved: true };
+        state = {
+            error: null,
+            fields: [],
+            committedQuantity: null,
+            currentPlan: null,
+            values: null,
+            saved: true,
+        };
     } catch (error) {
         state = toFailure(error, values);
     }

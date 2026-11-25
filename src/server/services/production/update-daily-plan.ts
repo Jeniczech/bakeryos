@@ -9,6 +9,7 @@ import { canUpdatePlan, getCommittedQuantity } from '@/server/domain/availabilit
 import {
     InvalidRequestError,
     PlanBelowCommitmentsError,
+    PlanChangedError,
     ProductNotFoundError,
     ProductUnavailableError,
     toValidationIssues,
@@ -21,6 +22,12 @@ export type UpdateDailyPlanInput = {
     date: string; // YYYY-MM-DD
     capacity: number;
     walkInQuantity: number;
+    /**
+     * The capacity and walk-in quantity the editor showed (the product defaults when no plan
+     * existed yet). When given, the update is rejected if the stored plan differs, so an
+     * outdated form never undoes a newer save.
+     */
+    expected?: { capacity: number; walkInQuantity: number };
 };
 
 const parseInput = (input: UpdateDailyPlanInput): DailyPlanUpdate => {
@@ -74,6 +81,16 @@ const updateInTransaction = async (
     await assertPlanEditable(tx, update, getNow());
     const [plan] = await lockDailyPlans(tx, update.date, [update.productId]);
     const product = await assertPlanEditable(tx, update, getNow());
+    if (
+        update.expected &&
+        (plan.capacity !== update.expected.capacity ||
+            plan.walkInQuantity !== update.expected.walkInQuantity)
+    ) {
+        throw new PlanChangedError(update.productId, {
+            capacity: plan.capacity,
+            walkInQuantity: plan.walkInQuantity,
+        });
+    }
     // Keyed by the lowercase ID; the schema lowercases `productId`, so the entry always exists.
     const committed = (await getCommittedQuantities(tx, update.date, [update.productId])).get(
         update.productId,

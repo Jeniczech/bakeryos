@@ -5,11 +5,20 @@ import { Notice } from '@/components/ui/notice';
 import { getPragueDate, isValidCalendarDate } from '@/lib/date-time/prague';
 import { formatLongDate } from '@/lib/formatting/dates';
 import { requireAdmin } from '@/server/auth/require-admin';
-import { getDailyProduction } from '@/server/services/production/get-daily-production';
+import {
+    getDailyProduction,
+    type ProductionDateLock,
+} from '@/server/services/production/get-daily-production';
 
 type SearchParams = PageProps<'/admin/production'>['searchParams'];
 
 const PATH = '/admin/production';
+
+const DATE_LOCK_MESSAGES: Record<ProductionDateLock, string> = {
+    BAKERY_CLOSED: 'Pekárna má v tento den zavřeno.',
+    PAST_DATE: 'Den už proběhl: plán slouží jen pro přehled a nelze ho měnit.',
+    BEYOND_PLANNING_WINDOW: 'Plán lze upravovat nejvýše 7 dní dopředu.',
+};
 
 const ProductionContent = async ({ searchParams }: { searchParams: SearchParams }) => {
     await requireAdmin();
@@ -36,16 +45,7 @@ const ProductionContent = async ({ searchParams }: { searchParams: SearchParams 
                 {formatLongDate(date)}
                 {date === today && ' (dnes)'}
             </h2>
-            {production.planDateRejection === 'BAKERY_CLOSED' && (
-                <Notice>Pekárna má v tento den zavřeno.</Notice>
-            )}
-            {production.planDateRejection === 'OUTSIDE_BOOKING_WINDOW' && (
-                <Notice>
-                    {date < today
-                        ? 'Den už proběhl: plán slouží jen pro přehled a nelze ho měnit.'
-                        : 'Plán lze upravovat nejvýše 7 dní dopředu.'}
-                </Notice>
-            )}
+            {production.dateLock && <Notice>{DATE_LOCK_MESSAGES[production.dateLock]}</Notice>}
             {production.rows.length === 0 ? (
                 <Notice>Na tento den se nic nevyrábí.</Notice>
             ) : (
