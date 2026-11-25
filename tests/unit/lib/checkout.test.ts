@@ -43,35 +43,40 @@ describe('resolveSubmissionAttempt', () => {
     const customer = { name: 'Jana', phone: '777123456' };
     const payload = buildReservationPayload('2026-11-27', customer, cart);
 
-    it('generates a key for the first attempt', () => {
-        expect(resolveSubmissionAttempt(null, payload, keys()).idempotencyKey).toBe('key-1');
+    it('generates a key for the first attempt and keeps no personal data', async () => {
+        const attempt = await resolveSubmissionAttempt(null, payload, keys());
+        expect(attempt.idempotencyKey).toBe('key-1');
+        expect(attempt.fingerprint).toMatch(/^[0-9a-f]{64}$/);
+        expect(JSON.stringify(attempt)).not.toMatch(/Jana|777123456/);
     });
 
-    it('reuses the key for an unchanged retry, including formatting-only edits', () => {
+    it('reuses the key for an unchanged retry, including formatting-only edits', async () => {
         const generate = keys();
-        const first = resolveSubmissionAttempt(null, payload, generate);
+        const first = await resolveSubmissionAttempt(null, payload, generate);
         const reformatted = buildReservationPayload(
             '2026-11-27',
             { name: ' Jana', phone: '777 123 456' },
             [...cart].reverse(),
         );
-        expect(resolveSubmissionAttempt(first, reformatted, generate)).toBe(first);
+        expect(await resolveSubmissionAttempt(first, reformatted, generate)).toBe(first);
     });
 
-    it('generates a new key when the payload changes', () => {
+    it('generates a new key when the payload changes', async () => {
         const generate = keys();
-        const first = resolveSubmissionAttempt(null, payload, generate);
+        const first = await resolveSubmissionAttempt(null, payload, generate);
         const changes = [
             buildReservationPayload('2026-11-28', customer, cart),
             buildReservationPayload('2026-11-27', { ...customer, name: 'Petr' }, cart),
             buildReservationPayload('2026-11-27', customer, [{ ...cart[0], quantity: 3 }]),
         ];
-        expect(
-            changes.map((changed) => resolveSubmissionAttempt(first, changed, generate)),
-        ).toEqual([
-            expect.objectContaining({ idempotencyKey: 'key-2' }),
-            expect.objectContaining({ idempotencyKey: 'key-3' }),
-            expect.objectContaining({ idempotencyKey: 'key-4' }),
+        const attempts = [];
+        for (const changed of changes) {
+            attempts.push(await resolveSubmissionAttempt(first, changed, generate));
+        }
+        expect(attempts.map((attempt) => attempt.idempotencyKey)).toEqual([
+            'key-2',
+            'key-3',
+            'key-4',
         ]);
     });
 });

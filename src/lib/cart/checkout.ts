@@ -33,7 +33,11 @@ export const reservationConfirmationSchema = z.object({
 
 export type ReservationConfirmation = z.infer<typeof reservationConfirmationSchema>;
 
-/** The key a payload was last sent with, so an unchanged retry can reuse it. */
+/**
+ * The key a payload was last sent with, so an unchanged retry can reuse it. The payload is kept
+ * only as a SHA-256 hash: the attempt is stored in `sessionStorage`, and the payload holds the
+ * customer's name and phone.
+ */
 export const submissionAttemptSchema = z.object({
     idempotencyKey: z.string(),
     fingerprint: z.string(),
@@ -55,18 +59,26 @@ export const buildReservationPayload = (
     items: normalizeItems(cart.map(({ productId, quantity }) => ({ productId, quantity }))),
 });
 
-const fingerprintPayload = (payload: ReservationPayload): string => JSON.stringify(payload);
+const fingerprintPayload = async (payload: ReservationPayload): Promise<string> => {
+    const digest = await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(JSON.stringify(payload)),
+    );
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(
+        '',
+    );
+};
 
 /**
  * The attempt to send `payload` with: the previous key when the payload is unchanged, so a
  * retry after a lost response cannot create a second reservation, and a new key otherwise.
  */
-export const resolveSubmissionAttempt = (
+export const resolveSubmissionAttempt = async (
     previous: SubmissionAttempt | null,
     payload: ReservationPayload,
     generateKey: () => string,
-): SubmissionAttempt => {
-    const fingerprint = fingerprintPayload(payload);
+): Promise<SubmissionAttempt> => {
+    const fingerprint = await fingerprintPayload(payload);
     if (previous?.fingerprint === fingerprint) {
         return previous;
     }

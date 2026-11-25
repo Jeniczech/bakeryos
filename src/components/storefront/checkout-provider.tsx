@@ -56,7 +56,7 @@ export const CheckoutProvider = ({ children }: { children: React.ReactNode }) =>
             inFlight.current = true;
             setSubmitting(true);
             setFailure(null);
-            const attempt = resolveSubmissionAttempt(readStoredAttempt(), payload, () =>
+            const attempt = await resolveSubmissionAttempt(readStoredAttempt(), payload, () =>
                 crypto.randomUUID(),
             );
             storeAttempt(attempt);
