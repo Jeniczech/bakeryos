@@ -24,13 +24,15 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     return <CartContext value={value}>{children}</CartContext>;
 };
 
-export const useCart = (): CartState => {
+const useCartContext = (): CartContextValue => {
     const context = use(CartContext);
     if (!context) {
-        throw new Error('useCart must be used within a CartProvider.');
+        throw new Error('The cart must be used within a CartProvider.');
     }
     return context;
 };
+
+export const useCart = (): CartState => useCartContext();
 
 /**
  * The cart with a `dispatch` that stamps each edit with the selected pickup date, or `null`
@@ -40,10 +42,7 @@ export const useCart = (): CartState => {
 export const useCartEditor = (
     pickupDate: string | null,
 ): CartState & { dispatch: (action: CartAction) => void } => {
-    const context = use(CartContext);
-    if (!context) {
-        throw new Error('useCartEditor must be used within a CartProvider.');
-    }
+    const context = useCartContext();
     const { dispatchDated } = context;
     return { ...context, dispatch: (action) => dispatchDated({ ...action, pickupDate }) };
 };

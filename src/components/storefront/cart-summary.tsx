@@ -27,20 +27,28 @@ const CATALOG_STATUS_MESSAGES: Record<Exclude<CartCatalog['status'], 'open'>, st
     failed: 'Ceny a dostupnost se nepodařilo načíst. Zkuste stránku obnovit.',
 };
 
-/** Shown after a date switch, so changed prices and flagged lines do not go unnoticed. */
-const DateChangeNotice = ({
-    pickupDate,
+/**
+ * Says the cart was checked again after a date switch, and warns while any line is flagged,
+ * whatever the date, so changed prices and flagged lines do not go unnoticed.
+ */
+const CartReviewNotice = ({
+    changedToDate,
     flaggedLines,
 }: {
-    pickupDate: string;
+    changedToDate: string | null;
     flaggedLines: number;
-}) => (
-    <Notice tone={flaggedLines > 0 ? 'warning' : 'info'}>
-        Košík jsme přepočítali pro nově vybraný den ({formatLongDate(pickupDate)}).
-        {flaggedLines > 0 &&
-            ' Některé položky na tento den nelze rezervovat v požadovaném množství. Upravte je prosím.'}
-    </Notice>
-);
+}) => {
+    if (changedToDate === null && flaggedLines === 0) {
+        return null;
+    }
+    const messages = [
+        changedToDate !== null &&
+            `Košík jsme přepočítali pro nově vybraný den (${formatLongDate(changedToDate)}).`,
+        flaggedLines > 0 &&
+            'Některé položky na tento den nelze rezervovat v požadovaném množství. Upravte je prosím.',
+    ].filter(Boolean);
+    return <Notice tone={flaggedLines > 0 ? 'warning' : 'info'}>{messages.join(' ')}</Notice>;
+};
 
 const CartLineIssueMessage = ({ reviewed }: { reviewed: ReviewedCartLine }) => {
     if (reviewed.issue === 'NOT_OFFERED') {
@@ -148,8 +156,8 @@ export const CartSummary = ({
     const isOpen = catalog.status === 'open';
     const review = reviewCart(cart, isOpen ? catalog.products : []);
     // The cart is empty when rendered on the server, so formatting the date cannot mismatch.
-    const showDateChange =
-        isOpen && pickupDate !== null && isCartFromOtherDate(cartState, pickupDate);
+    const changedToDate =
+        pickupDate !== null && isCartFromOtherDate(cartState, pickupDate) ? pickupDate : null;
     return (
         <section
             aria-labelledby={headingId}
@@ -158,9 +166,9 @@ export const CartSummary = ({
             <h2 id={headingId} className="text-lg font-semibold text-amber-950">
                 Košík
             </h2>
-            {showDateChange && (
-                <DateChangeNotice
-                    pickupDate={pickupDate}
+            {isOpen && (
+                <CartReviewNotice
+                    changedToDate={changedToDate}
                     flaggedLines={countFlaggedLines(review.lines)}
                 />
             )}

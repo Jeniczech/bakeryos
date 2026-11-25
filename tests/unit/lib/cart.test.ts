@@ -172,10 +172,8 @@ describe('cartStateReducer', () => {
 
     it('keeps the previous date for edits without a selected date', () => {
         const state = edit(edit(empty, 2, '2026-11-26'), 1, null);
-        expect(state).toEqual({
-            cart: [{ ...state.cart[0], quantity: 1 }],
-            editedForDate: '2026-11-26',
-        });
+        expect(state.cart[0]?.quantity).toBe(1);
+        expect(state.editedForDate).toBe('2026-11-26');
     });
 
     it('ignores refused edits, keeping the date', () => {
