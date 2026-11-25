@@ -8,6 +8,7 @@ import { SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
 import { formatLongDate, formatPragueDateTime } from '@/lib/formatting/dates';
 import { ReservationNotFoundError } from '@/server/domain/errors';
+import { describeForLog } from '@/server/http/problem-details';
 import {
     getReservationByToken,
     type ReservationDetails,
@@ -82,7 +83,9 @@ const ManagedReservation = async ({
                 </div>
             );
         }
-        throw error;
+        // Query errors carry the token hash as a parameter, so only a sanitized form is logged.
+        console.error('Reservation management page: unexpected error', describeForLog(error));
+        throw new Error('The reservation could not be loaded.');
     }
     const { heading, cancellationNote } = describeReservation(details);
     return (
