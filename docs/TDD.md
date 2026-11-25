@@ -321,7 +321,9 @@ newCapacity < newWalkInQuantity + committedQuantity
 
 Then update the plan and commit. Admin may do this after cutoff and for today, but cannot violate commitments. Plans for past dates (before today in `Europe/Prague`) cannot be changed, because they are production history. The date must also be within the planning window (today through today + 7) and a bakery-open date, and the product must be active and offered on that weekday, so no plan is materialized for an ineligible product/date. The past-date check is repeated after locking, because the lock wait may cross midnight.
 
-Returns the updated `DailyProductionItem`. Rejections use typed domain errors: `INVALID_REQUEST` (Zod validation, walk-in above capacity, or a past date), `OUTSIDE_BOOKING_WINDOW` and `BAKERY_CLOSED` (pickup-date errors), `PRODUCT_NOT_FOUND`, `PRODUCT_UNAVAILABLE` (inactive or not offered on that weekday), and `PLAN_BELOW_COMMITMENTS` (with the committed quantity).
+**Stale-save protection:** the optional `expected` input carries the capacity and walk-in quantity the editor loaded (the product defaults when no plan existed yet). After locking, the service compares them with the locked plan and rejects the update if either differs, so an outdated form cannot silently undo another administrator's save. Comparing values needs no version column, and a first write is compared with the plan it just materialized; the rejection rolls that materialization back. The admin form always sends `expected`.
+
+Returns the updated `DailyProductionItem`. Rejections use typed domain errors: `INVALID_REQUEST` (Zod validation, walk-in above capacity, or a past date), `OUTSIDE_BOOKING_WINDOW` and `BAKERY_CLOSED` (pickup-date errors), `PRODUCT_NOT_FOUND`, `PRODUCT_UNAVAILABLE` (inactive or not offered on that weekday), `PLAN_BELOW_COMMITMENTS` (with the committed quantity), and `PLAN_CHANGED` (with the current capacity and walk-in quantity).
 
 ## 7. Application services and project layout
 
@@ -408,6 +410,7 @@ type UpdateDailyPlanInput = {
   date: string;
   capacity: number;
   walkInQuantity: number;
+  expected?: { capacity: number; walkInQuantity: number }; // values the editor loaded (§6.6)
 };
 
 type DailyProductionItem = {
@@ -497,6 +500,10 @@ Admin functions:
 - Reservations by pickup date; manual phone reservation; mark picked up, cancelled, or no-show.
 - Product create/edit/deactivate; default daily capacity and walk-in allocation.
 - Daily production table and date-specific plan overrides.
+
+Product edits send the version the editor loaded (`updated_at` in exact microseconds); `updateProduct` writes only if the stored version still matches and otherwise rejects with `PRODUCT_CHANGED`, so an outdated form never undoes a newer save. Daily plan overrides use the expected-values check in §6.6.
+
+The production table for a date lists the products offered that day plus any product with committed reservations on it; dates without a stored plan show the product defaults without materializing a plan. Past dates are read-only and list stored plans only, so later changes to defaults or the catalog never alter history.
 
 The manual reservation form offers the same pickup dates as the storefront (tomorrow through today + 7, before cutoff) and validates opening days, product weekdays, and capacity. Online quantity limits do not apply.
 
