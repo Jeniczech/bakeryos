@@ -29,6 +29,8 @@ The seed is safe to re-run: it upserts the opening days and administrator (reset
 
 Products are managed at `/admin/products`. Unchecking **Aktivní** deactivates a product: it disappears from the catalog and cannot be reserved, while existing reservations keep their name and price snapshots. A new product has no weekday restrictions, so it is offered on every open day (the weekday editor is deferred). Changed default capacity and walk-in quantity apply only to dates without a daily plan yet. Saving a product invalidates the storefront's cached catalog immediately. A save is rejected if the product was changed after the form was loaded (in another tab, by browser back/forward, or by a second admin), so an outdated form never undoes a newer change.
 
+The production view at `/admin/production` lists, per date, the products offered that day plus any product with reservations still counted in production (for example one deactivated since, labelled as such). It shows reserved units, late cancellations (which stay in production), walk-in quantity, the recommended quantity to bake and the remaining availability; dates without a daily plan use the product defaults. Capacity and walk-in quantity can be overridden per product for today through today+7, never below walk-ins plus already committed units. A save is rejected if the plan changed after the row was loaded, so an outdated form never undoes another save. Past dates are read-only and show only stored plans, so later changes to product defaults or the catalog never rewrite history.
+
 `GET /api/health` returns `{"status":"ok","database":"ok"}` when the database is reachable, `503` otherwise.
 
 ## Public API

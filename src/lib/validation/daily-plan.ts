@@ -12,6 +12,10 @@ export const dailyPlanUpdateSchema = z
         date: calendarDateSchema,
         capacity: planQuantitySchema,
         walkInQuantity: planQuantitySchema,
+        /** The plan the editor loaded; the update is rejected if the stored plan differs. */
+        expected: z
+            .object({ capacity: planQuantitySchema, walkInQuantity: planQuantitySchema })
+            .optional(),
     })
     .refine((plan) => plan.walkInQuantity <= plan.capacity, {
         path: ['walkInQuantity'],

@@ -21,7 +21,7 @@ import {
 export type OfferedProduct = { id: string; name: string; price: number };
 
 /** Opening days, and the closures between `firstDate` and `lastDate` inclusive. */
-const loadSchedule = async (
+export const loadSchedule = async (
     db: DbExecutor,
     firstDate: string,
     lastDate: string = firstDate,
