@@ -12,7 +12,10 @@ import {
     reservations,
 } from '@/server/db/schema';
 import { PickupDateUnavailableError } from '@/server/domain/errors';
-import { getAvailableProducts } from '@/server/services/products/get-available-products';
+import {
+    getAvailableProducts,
+    listAvailableProducts,
+} from '@/server/services/products/get-available-products';
 import { getOfferedProducts } from '@/server/services/products/get-offered-products';
 import { createReservation } from '@/server/services/reservations/create-reservation';
 
@@ -166,6 +169,92 @@ describe('getAvailableProducts', () => {
 
         await expect(attempt).rejects.toBeInstanceOf(PickupDateUnavailableError);
         await expect(attempt).rejects.toMatchObject({ code });
+    });
+});
+
+const insertCancelledReservation = async (
+    productId: string,
+    quantity: number,
+    retainForProduction: boolean,
+) => {
+    const [reservation] = await getDb()
+        .insert(reservations)
+        .values({
+            pickupDate: PICKUP_DATE,
+            customerName: 'Jane Doe',
+            customerPhone: '+420777123456',
+            source: 'online',
+            status: 'cancelled',
+            retainForProduction,
+            cancelledAt: new Date(),
+            managementTokenHash: randomUUID(),
+            idempotencyKey: randomUUID(),
+            requestHash: 'hash',
+        })
+        .returning();
+    await getDb().insert(reservationItems).values({
+        reservationId: reservation.id,
+        productId,
+        productNameSnapshot: 'Catalog test loaf',
+        unitPriceSnapshot: 4200,
+        quantity,
+    });
+};
+
+describe('listAvailableProducts', () => {
+    /** Only this test's products, keyed by ID. */
+    const listOwnProducts = async () =>
+        new Map(
+            (await listAvailableProducts(getDb(), PICKUP_DATE))
+                .filter((product) => createdProductIds.includes(product.id))
+                .map((product) => [product.id, product]),
+        );
+
+    it('does not depend on the clock, so it lists dates outside the booking window', async () => {
+        // The real clock puts PICKUP_DATE far outside the window; getAvailableProducts rejects it.
+        const product = await insertProduct({ price: 4200, defaultCapacity: 7 });
+
+        const listed = await listOwnProducts();
+
+        expect(listed.get(product.id)).toMatchObject({ price: 4200, remainingQuantity: 7 });
+    });
+
+    it('returns the current price right after it changes', async () => {
+        const product = await insertProduct({ price: 4200 });
+        await getDb().update(products).set({ price: 4900 }).where(eq(products.id, product.id));
+
+        const listed = await listOwnProducts();
+
+        expect(listed.get(product.id)?.price).toBe(4900);
+    });
+
+    it('counts late cancellations retained for production but not early ones', async () => {
+        const product = await insertProduct({ defaultCapacity: 10 });
+        await insertCancelledReservation(product.id, 3, true);
+        await insertCancelledReservation(product.id, 4, false);
+
+        const listed = await listOwnProducts();
+
+        expect(listed.get(product.id)?.remainingQuantity).toBe(7);
+    });
+
+    it('omits withdrawn products so callers can tell them apart from sold-out ones', async () => {
+        const soldOut = await insertProduct({ defaultCapacity: 2, defaultWalkInQuantity: 2 });
+        const deactivated = await insertProduct();
+        const unscheduled = await insertProduct({}, [WEDNESDAY]);
+        await getDb()
+            .update(products)
+            .set({ active: false })
+            .where(eq(products.id, deactivated.id));
+        await getDb().delete(productWeekdays).where(eq(productWeekdays.productId, unscheduled.id));
+        await getDb()
+            .insert(productWeekdays)
+            .values({ productId: unscheduled.id, weekday: MONDAY });
+
+        const listed = await listOwnProducts();
+
+        expect([...listed.keys()]).toEqual([soldOut.id]);
+        expect(listed.get(soldOut.id)?.remainingQuantity).toBe(0);
     });
 });
 
