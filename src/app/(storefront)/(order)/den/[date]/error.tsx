@@ -12,7 +12,7 @@ const PickupDateError = ({ error, retry }: { error: unknown; retry: () => void }
         retry={retry}
         headingLevel="h2"
         heading="Nabídku se nepodařilo načíst"
-        message="Nabídku na tento den se teď nepodařilo načíst. Košík vám zůstává, zkuste to prosím za chvíli znovu."
+        message="Nabídku na tento den se teď nepodařilo načíst. Váš košík zůstane uložen, zkuste to prosím za chvíli znovu nebo vyberte jiný den."
     />
 );
 

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { unstable_rethrow } from 'next/navigation';
 import { connection } from 'next/server';
 import { Suspense } from 'react';
 import { ReservationCancellation } from '@/components/storefront/reservation-cancellation';
@@ -70,6 +71,7 @@ const ManagedReservation = async ({
     try {
         details = await getReservationByToken(token);
     } catch (error) {
+        unstable_rethrow(error);
         if (error instanceof ReservationNotFoundError) {
             return (
                 <div className="flex flex-col items-start gap-4">
@@ -83,9 +85,9 @@ const ManagedReservation = async ({
                 </div>
             );
         }
-        // Query errors carry the token hash as a parameter, so only a sanitized form is logged.
-        console.error('Reservation management page: unexpected error', describeForLog(error));
-        throw new Error('The reservation could not be loaded.');
+        // Query errors carry the token hash as a parameter. Next logs the thrown error with its
+        // digest, so the sanitized cause appears in the same log entry.
+        throw new Error('The reservation could not be loaded.', { cause: describeForLog(error) });
     }
     const { heading, cancellationNote } = describeReservation(details);
     return (

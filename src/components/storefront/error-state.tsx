@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
 
 /**
  * Fallback for an unexpected failure such as an unreachable database. Server errors reach the
- * browser only as a digest, so nothing sensitive is shown; the digest matches the server log.
+ * browser only as a digest, so nothing sensitive is shown; Next logs the same digest with the
+ * error on the server.
  */
 export const ErrorState = ({
     error,
@@ -23,13 +24,14 @@ export const ErrorState = ({
     headingLevel: 'h1' | 'h2';
     message: string;
 }) => {
+    const headingId = useId();
     useEffect(() => {
         console.error(error);
     }, [error]);
     return (
-        <section aria-labelledby="error-heading" className="flex flex-col items-start gap-4">
+        <section aria-labelledby={headingId} className="flex flex-col items-start gap-4">
             <Heading
-                id="error-heading"
+                id={headingId}
                 className="text-2xl font-semibold tracking-tight text-amber-950"
             >
                 {heading}
