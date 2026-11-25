@@ -12,6 +12,7 @@ import {
 import { formatLongDate } from '@/lib/formatting/dates';
 import { formatPrice } from '@/lib/formatting/money';
 import { useCart, useCartEditor } from './cart-provider';
+import { useCheckout } from './checkout-provider';
 import { QuantityStepper } from './quantity-stepper';
 
 /** The selected date's live catalog, as far as the cart needs it. */
@@ -76,6 +77,7 @@ const CartLineItem = ({
     showPrices: boolean;
 }) => {
     const { dispatch } = useCartEditor(pickupDate);
+    const { submitting } = useCheckout();
     const { line, product } = reviewed;
     const name = product?.name ?? line.name;
     return (
@@ -92,8 +94,9 @@ const CartLineItem = ({
                 <button
                     type="button"
                     onClick={() => dispatch({ type: 'remove', productId: line.productId })}
+                    disabled={submitting}
                     aria-label={`Odebrat z košíku: ${name}`}
-                    className="shrink-0 text-sm text-stone-500 underline-offset-2 hover:text-amber-900 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                    className="shrink-0 text-sm text-stone-500 underline-offset-2 hover:text-amber-900 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:text-stone-300 disabled:no-underline"
                 >
                     Odebrat
                 </button>

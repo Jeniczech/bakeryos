@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildReservationPayload, resolveSubmissionAttempt } from '@/lib/cart/checkout';
+import {
+    buildReservationPayload,
+    describeSubmitFailure,
+    parseRetryAfterMinutes,
+    reservationConfirmationSchema,
+    resolveSubmissionAttempt,
+} from '@/lib/cart/checkout';
 
 const BREAD = '22222222-2222-4222-8222-222222222222';
 const ROLL = '11111111-1111-4111-8111-111111111111';
@@ -67,5 +73,63 @@ describe('resolveSubmissionAttempt', () => {
             expect.objectContaining({ idempotencyKey: 'key-3' }),
             expect.objectContaining({ idempotencyKey: 'key-4' }),
         ]);
+    });
+});
+
+describe('describeSubmitFailure', () => {
+    it('asks for a catalog refresh when the displayed catalog is out of date', () => {
+        expect(describeSubmitFailure('INSUFFICIENT_CAPACITY')).toEqual({
+            kind: 'CAPACITY',
+            refreshCatalog: true,
+        });
+        expect(describeSubmitFailure('PRODUCT_UNAVAILABLE').kind).toBe('UNAVAILABLE');
+        expect(describeSubmitFailure('CUTOFF_PASSED')).toEqual({
+            kind: 'DATE_CLOSED',
+            refreshCatalog: true,
+        });
+    });
+
+    it('reports rate limiting without a refresh', () => {
+        expect(describeSubmitFailure('RATE_LIMITED')).toEqual({
+            kind: 'RATE_LIMITED',
+            refreshCatalog: false,
+        });
+    });
+
+    it('falls back to a retry for unknown codes and network errors', () => {
+        for (const code of ['INTERNAL_ERROR', 'IDEMPOTENCY_CONFLICT', null]) {
+            expect(describeSubmitFailure(code)).toEqual({ kind: 'RETRY', refreshCatalog: false });
+        }
+    });
+});
+
+describe('parseRetryAfterMinutes', () => {
+    it('rounds seconds up to whole minutes, at least one', () => {
+        expect(parseRetryAfterMinutes('61')).toBe(2);
+        expect(parseRetryAfterMinutes('5')).toBe(1);
+        expect(parseRetryAfterMinutes(null)).toBe(1);
+        expect(parseRetryAfterMinutes('soon')).toBe(1);
+    });
+});
+
+describe('reservationConfirmationSchema', () => {
+    const confirmation = {
+        reservationNumber: 'BK-000123',
+        pickupDate: '2026-11-27',
+        status: 'confirmed',
+        totalPrice: 8400,
+        items: [{ productId: BREAD, productName: 'Chléb', unitPrice: 4200, quantity: 2 }],
+        managementUrl: 'https://example.test/reservations/manage/token',
+    };
+
+    it('accepts a confirmation body', () => {
+        expect(reservationConfirmationSchema.safeParse(confirmation).success).toBe(true);
+    });
+
+    it('rejects an unexpected body', () => {
+        expect(
+            reservationConfirmationSchema.safeParse({ ...confirmation, items: null }).success,
+        ).toBe(false);
+        expect(reservationConfirmationSchema.safeParse('ok').success).toBe(false);
     });
 });

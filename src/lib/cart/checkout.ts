@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { CalendarDate } from '@/lib/date-time/prague';
 import { normalizeItems, normalizePhone } from '@/lib/validation/reservation';
 import type { Cart } from './cart';
@@ -10,18 +11,35 @@ export type ReservationPayload = {
     items: Array<{ productId: string; quantity: number }>;
 };
 
-/** The confirmation `POST /api/reservations` returns; prices in haléře. */
-export type ReservationConfirmation = {
-    reservationNumber: string;
-    pickupDate: CalendarDate;
-    status: string;
-    totalPrice: number;
-    items: Array<{ productId: string; productName: string; unitPrice: number; quantity: number }>;
-    managementUrl: string;
-};
+/**
+ * The confirmation `POST /api/reservations` returns; prices in haléře. Parsed rather than cast
+ * on the client: it is read from the response and from `sessionStorage`.
+ */
+export const reservationConfirmationSchema = z.object({
+    reservationNumber: z.string(),
+    pickupDate: z.string(),
+    status: z.enum(['confirmed', 'picked_up', 'cancelled', 'no_show']),
+    totalPrice: z.int(),
+    items: z.array(
+        z.object({
+            productId: z.string(),
+            productName: z.string(),
+            unitPrice: z.int(),
+            quantity: z.int(),
+        }),
+    ),
+    managementUrl: z.string(),
+});
+
+export type ReservationConfirmation = z.infer<typeof reservationConfirmationSchema>;
 
 /** The key a payload was last sent with, so an unchanged retry can reuse it. */
-export type SubmissionAttempt = { idempotencyKey: string; fingerprint: string };
+export const submissionAttemptSchema = z.object({
+    idempotencyKey: z.string(),
+    fingerprint: z.string(),
+});
+
+export type SubmissionAttempt = z.infer<typeof submissionAttemptSchema>;
 
 /**
  * Normalized as the server normalizes it, so formatting-only edits (spaces in the phone, item
@@ -53,4 +71,39 @@ export const resolveSubmissionAttempt = (
         return previous;
     }
     return { idempotencyKey: generateKey(), fingerprint };
+};
+
+/** What a failed submission tells the customer; the UI maps each kind to its own copy. */
+export type SubmitFailureKind =
+    'CAPACITY' | 'UNAVAILABLE' | 'DATE_CLOSED' | 'RATE_LIMITED' | 'RETRY';
+
+const FAILURE_KINDS_BY_CODE: Partial<Record<string, SubmitFailureKind>> = {
+    INSUFFICIENT_CAPACITY: 'CAPACITY',
+    PRODUCT_UNAVAILABLE: 'UNAVAILABLE',
+    INVALID_DATE: 'DATE_CLOSED',
+    OUTSIDE_BOOKING_WINDOW: 'DATE_CLOSED',
+    CUTOFF_PASSED: 'DATE_CLOSED',
+    BAKERY_CLOSED: 'DATE_CLOSED',
+    RATE_LIMITED: 'RATE_LIMITED',
+};
+
+/**
+ * Classifies a failed `POST /api/reservations` by its Problem Details `code` (`null` for a
+ * network error or an unreadable body). `refreshCatalog` is set when the displayed catalog is
+ * out of date, so a refresh lets the cart flag what the customer has to change.
+ */
+export const describeSubmitFailure = (
+    code: string | null,
+): { kind: SubmitFailureKind; refreshCatalog: boolean } => {
+    const kind = (code && FAILURE_KINDS_BY_CODE[code]) || 'RETRY';
+    return {
+        kind,
+        refreshCatalog: kind === 'CAPACITY' || kind === 'UNAVAILABLE' || kind === 'DATE_CLOSED',
+    };
+};
+
+/** Whole minutes from a `Retry-After` header in seconds, at least 1. */
+export const parseRetryAfterMinutes = (header: string | null): number => {
+    const seconds = Number(header);
+    return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds / 60) : 1;
 };

@@ -1,24 +1,44 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Notice } from '@/components/ui/notice';
 import { canSubmitCart, reviewCart } from '@/lib/cart/cart';
-import { buildReservationPayload, type ReservationConfirmation } from '@/lib/cart/checkout';
+import { buildReservationPayload } from '@/lib/cart/checkout';
 import { validateCustomerDetails } from '@/lib/cart/customer-details';
-import { useCartEditor } from './cart-provider';
+import { useCart } from './cart-provider';
 import type { CartCatalog } from './cart-summary';
-import { useCheckout } from './checkout-provider';
+import { useCheckout, type SubmitFailure } from './checkout-provider';
 import { useCustomer } from './customer-provider';
 
-type SubmitError = 'CUSTOMER' | 'FAILED';
+const FAILURE_MESSAGES: Record<SubmitFailure['kind'], (failure: SubmitFailure) => string> = {
+    CAPACITY: () => 'Některé pečivo mezitím došlo. Upravte prosím množství označená v košíku.',
+    UNAVAILABLE: () => 'Některé pečivo už na tento den nelze rezervovat. Upravte prosím košík.',
+    DATE_CLOSED: () => 'Na vybraný den už rezervace nepřijímáme. Vyberte prosím jiný den.',
+    RATE_LIMITED: ({ retryAfterMinutes }) =>
+        `Příliš mnoho pokusů o rezervaci. Zkuste to prosím znovu za ${retryAfterMinutes} min.`,
+    RETRY: () => 'Rezervaci se nepodařilo odeslat. Zkuste to prosím znovu.',
+};
 
-const hasCustomerErrors = (errors: ReturnType<typeof validateCustomerDetails>): boolean =>
-    errors.name !== null || errors.phone !== null;
+/** Why the button is disabled, where the cart beside it does not already say so. */
+const getDisabledHint = (catalog: CartCatalog, canSubmit: boolean): string | null => {
+    switch (catalog.status) {
+        case 'noDate':
+            return 'Vyberte den vyzvednutí.';
+        case 'closed':
+            return 'Na vybraný den rezervovat nelze.';
+        case 'failed':
+            return 'Rezervaci teď nelze odeslat. Zkuste stránku obnovit.';
+        case 'open':
+            return canSubmit ? null : 'Nejprve upravte položky označené v košíku.';
+        case 'loading':
+            return null;
+    }
+};
 
 /**
  * Sends the reservation. Disabled while the date's catalog is unknown or the cart has flagged
  * lines; invalid contact details are shown on click instead, so the customer learns what is
- * missing. A retry of an unchanged reservation reuses its idempotency key.
+ * missing.
  */
 export const CheckoutButton = ({
     catalog,
@@ -28,81 +48,53 @@ export const CheckoutButton = ({
     /** `null` while no date is selected or the date is still loading. */
     pickupDate: string | null;
 }) => {
-    const { cart, dispatch } = useCartEditor(pickupDate);
+    const { cart } = useCart();
     const { customer, markTouched } = useCustomer();
-    const { startAttempt, confirm } = useCheckout();
-    const [pending, setPending] = useState(false);
-    const [error, setError] = useState<SubmitError | null>(null);
-    // State updates are not synchronous, so a fast double click is stopped by a ref.
-    const inFlight = useRef(false);
+    const { submitting, failure, submit } = useCheckout();
+    const [showCustomerError, setShowCustomerError] = useState(false);
     if (cart.length === 0) {
         return null;
     }
-    const isOpen = catalog.status === 'open';
     const canSubmit =
-        pickupDate !== null && isOpen && canSubmitCart(reviewCart(cart, catalog.products));
+        pickupDate !== null &&
+        catalog.status === 'open' &&
+        canSubmitCart(reviewCart(cart, catalog.products));
     const customerErrors = validateCustomerDetails(customer);
+    const hasCustomerErrors = customerErrors.name !== null || customerErrors.phone !== null;
 
-    const submit = async () => {
-        if (inFlight.current || !canSubmit || pickupDate === null) {
+    const onClick = () => {
+        if (!canSubmit || pickupDate === null) {
             return;
         }
-        if (hasCustomerErrors(customerErrors)) {
+        if (hasCustomerErrors) {
             markTouched('name');
             markTouched('phone');
-            setError('CUSTOMER');
+            setShowCustomerError(true);
             return;
         }
-        const payload = buildReservationPayload(pickupDate, customer, cart);
-        const idempotencyKey = startAttempt(payload);
-        inFlight.current = true;
-        setPending(true);
-        setError(null);
-        try {
-            const response = await fetch('/api/reservations', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idempotencyKey, ...payload }),
-            });
-            if (!response.ok) {
-                setError('FAILED');
-                return;
-            }
-            const confirmation = (await response.json()) as ReservationConfirmation;
-            dispatch({ type: 'clear' });
-            confirm(confirmation);
-        } catch {
-            // A lost response may still have created the reservation; the retry reuses the key.
-            setError('FAILED');
-        } finally {
-            inFlight.current = false;
-            setPending(false);
-        }
+        setShowCustomerError(false);
+        void submit(buildReservationPayload(pickupDate, customer, cart));
     };
 
-    const hint =
-        catalog.status === 'noDate'
-            ? 'Vyberte den vyzvednutí.'
-            : isOpen && !canSubmit
-              ? 'Nejprve upravte položky označené v košíku.'
-              : null;
+    const hint = getDisabledHint(catalog, canSubmit);
+    const currentFailure = failure?.pickupDate === pickupDate ? failure : null;
     return (
         <div className="flex flex-col gap-3">
             <button
                 type="button"
-                onClick={submit}
-                disabled={!canSubmit || pending}
+                onClick={onClick}
+                disabled={!canSubmit || submitting}
                 className="rounded-lg bg-amber-800 px-4 py-3 font-semibold text-white transition-colors hover:bg-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:hover:bg-stone-300"
             >
-                {pending ? 'Odesíláme…' : 'Odeslat rezervaci'}
+                {submitting ? 'Odesíláme…' : 'Odeslat rezervaci'}
             </button>
             {hint && <p className="text-sm text-stone-600">{hint}</p>}
-            {error === 'CUSTOMER' && hasCustomerErrors(customerErrors) && (
+            {showCustomerError && hasCustomerErrors && (
                 <Notice tone="warning">Doplňte prosím kontaktní údaje.</Notice>
             )}
-            {error === 'FAILED' && (
+            {currentFailure && (
                 <Notice tone="warning">
-                    Rezervaci se nepodařilo odeslat. Zkuste to prosím znovu.
+                    {FAILURE_MESSAGES[currentFailure.kind](currentFailure)}
                 </Notice>
             )}
         </div>
