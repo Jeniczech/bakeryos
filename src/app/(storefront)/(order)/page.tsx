@@ -13,7 +13,10 @@ const SelectedDate = ({ date }: { date: string | undefined }) => {
             <Suspense fallback={null}>
                 <PickupDateStatus pickupDate={date} />
             </Suspense>
-            <ProductCatalog pickupDate={date} />
+            {/* Keyed by date so each switch mounts a new boundary and shows the fallback. */}
+            <Suspense key={date} fallback={<Notice>Načítáme nabídku…</Notice>}>
+                <ProductCatalog pickupDate={date} />
+            </Suspense>
         </div>
     );
 };
