@@ -1,14 +1,24 @@
 import { connection } from 'next/server';
 import { Suspense } from 'react';
-import { PickupDatePicker } from '@/components/storefront/pickup-date-picker';
+import {
+    PickupDatePicker,
+    type PickupDateChoice,
+} from '@/components/storefront/pickup-date-picker';
+import { getOnlinePickupDates } from '@/components/storefront/pickup-date-status';
 import { Notice } from '@/components/ui/notice';
-import { getPickupDates } from '@/server/services/eligibility';
+import { formatShortDate } from '@/lib/formatting/dates';
 
 const PickupDates = async () => {
     // The window and cutoff depend on the current time, so the dates are never cached.
     await connection();
-    const dates = await getPickupDates('online');
-    return <PickupDatePicker dates={dates} />;
+    const dates = await getOnlinePickupDates();
+    // Formatted here so the browser's Intl data cannot cause hydration mismatches.
+    const choices: PickupDateChoice[] = dates.map(({ date, unavailableReason }) => ({
+        date,
+        ...formatShortDate(date),
+        unavailableReason,
+    }));
+    return <PickupDatePicker dates={choices} />;
 };
 
 /**

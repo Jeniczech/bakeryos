@@ -3,7 +3,22 @@ import Image from 'next/image';
 import { Notice } from '@/components/ui/notice';
 import { formatLongDate, formatPragueDateTime } from '@/lib/formatting/dates';
 import { getOnlineCutoff } from '@/server/domain/reservation-rules';
+import { getPickupDates } from '@/server/services/eligibility';
 import { getOfferedProducts } from '@/server/services/products/get-offered-products';
+
+/**
+ * The dates that can be booked online, cached so the catalog stays prefetchable. May lag the
+ * clock by up to `expire` around the cutoff or midnight; the uncached `PickupDateStatus` and
+ * the reservation transaction stay exact. Bounds the catalog cache to these dates.
+ */
+const getCachedBookableDates = async (): Promise<string[]> => {
+    'use cache';
+    // `expire` of 5 minutes is the shortest that still keeps the result in prefetches.
+    cacheLife({ stale: 300, revalidate: 60, expire: 300 });
+    cacheTag('catalog');
+    const dates = await getPickupDates('online', new Date());
+    return dates.filter((option) => option.unavailableReason === null).map(({ date }) => date);
+};
 
 /**
  * Product details change rarely, so they are cached per date and prefetched with the date
@@ -17,8 +32,11 @@ const getCachedOfferedProducts = async (pickupDate: string) => {
 };
 
 export const ProductCatalog = async ({ pickupDate }: { pickupDate: string }) => {
+    // Dates that cannot be booked show no catalog: `PickupDateStatus` explains why.
+    if (!(await getCachedBookableDates()).includes(pickupDate)) {
+        return null;
+    }
     const products = await getCachedOfferedProducts(pickupDate);
-    // Invalid dates and closed days: `PickupDateStatus` explains why.
     if (products === null) {
         return null;
     }

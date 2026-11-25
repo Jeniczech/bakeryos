@@ -2,11 +2,18 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { formatShortDate } from '@/lib/formatting/dates';
-import type { PickupDateOption } from '@/server/domain/reservation-rules';
+import type { PickupDateRejectionReason } from '@/server/domain/reservation-rules';
 import { PICKUP_DATE_LABELS } from './pickup-date-messages';
 
-export const PickupDatePicker = ({ dates }: { dates: readonly PickupDateOption[] }) => {
+/** A pickup date with its labels already formatted on the server. */
+export type PickupDateChoice = {
+    date: string;
+    weekday: string;
+    dayMonth: string;
+    unavailableReason: PickupDateRejectionReason | null;
+};
+
+export const PickupDatePicker = ({ dates }: { dates: readonly PickupDateChoice[] }) => {
     // Read on the client: the layout this lives in does not re-render when the date changes.
     const selectedDate = useParams<{ date?: string }>().date ?? null;
     return (
@@ -15,8 +22,7 @@ export const PickupDatePicker = ({ dates }: { dates: readonly PickupDateOption[]
                 Den vyzvednutí
             </h2>
             <ul className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-                {dates.map(({ date, unavailableReason }) => {
-                    const { weekday, dayMonth } = formatShortDate(date);
+                {dates.map(({ date, weekday, dayMonth, unavailableReason }) => {
                     const label = (
                         <>
                             <span className="text-sm font-medium">{weekday}</span>

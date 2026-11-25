@@ -63,11 +63,19 @@ export const listOfferedProducts = async (
  * and availability comes from `getAvailableProducts`.
  */
 export const getOfferedProducts = async (pickupDate: string): Promise<CatalogProduct[] | null> => {
-    const db = getDb();
-    if (!isValidCalendarDate(pickupDate) || !(await isBakeryOpenOn(db, pickupDate))) {
+    // Checked before querying, where an impossible date would fail as a SQL error.
+    if (!isValidCalendarDate(pickupDate)) {
         return null;
     }
-    const rows = await listOfferedProducts(db, pickupDate);
+    const db = getDb();
+    // Pool queries, so the two lookups run concurrently on separate connections.
+    const [isOpen, rows] = await Promise.all([
+        isBakeryOpenOn(db, pickupDate),
+        listOfferedProducts(db, pickupDate),
+    ]);
+    if (!isOpen) {
+        return null;
+    }
     return rows.map(({ id, name, description, imageUrl, price }) => ({
         id,
         name,
