@@ -513,7 +513,7 @@ Caching only speeds up what the storefront displays; it never affects reservatio
 
 - **URLs:** `/` asks for a pickup date; each date is a path segment, `/den/YYYY-MM-DD`. A path segment (not `?date=`) is required for instant switching: Next 16 reuses the page segment when only search params change and then waits for the server instead of rendering the `<Link prefetch>` payload.
 - **Cached:** the products offered on a date (name, description, image, price), via `'use cache'` with `cacheLife('minutes')` and tag `catalog`. They do not depend on the current time. Date links use `prefetch`, so switching dates renders from the prefetched cache without a server round trip.
-- **Never cached:** anything that depends on the current time or on reservations — the pickup-date list (booking window, cutoff) and the selected date's bookability. These render per request behind `<Suspense>` after `connection()`.
+- **Never cached:** anything that depends on the current time or on reservations — the pickup-date list (booking window, cutoff), the selected date's bookability, and remaining availability. These render per request behind `<Suspense>` after `connection()`.
 - The pickup-date picker lives in a layout shared by `/` and `/den/[date]`, so the date list loads once per visit.
 - Admin mutations to products, product weekdays, opening days, or closures must invalidate the `catalog` tag. Until they do, displayed product details may be stale for minutes; prices shown at confirmation always come from the database.
 
