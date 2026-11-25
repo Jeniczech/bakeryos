@@ -41,7 +41,7 @@ const PickupDates = async () => {
 /**
  * Shared by `/` and `/den/[date]` and not re-rendered on a date switch, so the date list loads
  * once per visit while the page below swaps the catalog for each date, and the cart survives
- * date switches. After a reservation, `CheckoutProvider` shows its confirmation instead.
+ * date switches. After a reservation, `CheckoutProvider` navigates to `/potvrzeni`.
  */
 const OrderLayout = ({ children }: LayoutProps<'/'>) => (
     <CartProvider>
