@@ -31,6 +31,7 @@ Prioritize correctness of reservation capacity, straightforward implementation, 
 | Framework | Next.js App Router |
 | Language | TypeScript strict mode |
 | UI | React + Tailwind CSS |
+| Admin toasts | sonner |
 | Database | PostgreSQL |
 | ORM and migrations | Drizzle ORM / Drizzle Kit |
 | Validation | Zod |

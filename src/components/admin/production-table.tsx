@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { toast } from 'sonner';
 import {
     updateDailyPlanAction,
     type DailyPlanField,
@@ -40,6 +41,10 @@ const errorMessage = (state: DailyPlanFormState): string | null => {
     }
 };
 
+/** Whether an input's text means a different number than the stored one. */
+const differsFromStored = (value: string, stored: number): boolean =>
+    value.trim() === '' || Number(value) !== stored;
+
 const NOTICE_LABELS: Record<ProductionRowNotice, string> = {
     INACTIVE: 'neaktivní',
     NOT_OFFERED_ON_DATE: 'v tento den mimo nabídku',
@@ -63,7 +68,7 @@ const QuantityInput = ({
     formId: string;
     defaultValue: string;
     state: DailyPlanFormState;
-    onChange: () => void;
+    onChange: (value: string) => void;
 }) => (
     <input
         form={formId}
@@ -75,9 +80,8 @@ const QuantityInput = ({
         required
         aria-label={label}
         defaultValue={defaultValue}
-        onChange={onChange}
+        onChange={(event) => onChange(event.target.value)}
         aria-invalid={state.fields.includes(field) || undefined}
-        aria-describedby={state.error ? `${formId}-error` : undefined}
         className={INPUT_CLASSES}
     />
 );
@@ -109,16 +113,52 @@ const ProductCell = ({ row }: { row: DailyProductionRow }) => (
  * Inputs sit in their own cells and join the row's form through the `form` attribute, since a
  * form cannot wrap a table row. The form also sends the stored values the inputs started
  * from, so the server rejects the save if someone changed the plan in the meantime; the
- * inputs are keyed on those values, so they start over whenever the stored plan changes.
+ * inputs are keyed on those values, so they start over whenever the stored plan changes. The
+ * outcome of each save is reported in a toast. Saving is enabled only while the inputs differ
+ * from the stored plan.
  */
 const EditableRow = ({ row, date }: { row: DailyProductionRow; date: string }) => {
-    const [state, formAction, pending] = useActionState(updateDailyPlanAction, INITIAL_STATE);
-    // Hides "Uloženo" once the inputs differ from what was saved.
-    const [editedSinceSubmit, setEditedSinceSubmit] = useState(false);
-    const markEdited = () => setEditedSinceSubmit(true);
+    // One toast per row, so a newer outcome replaces the previous one.
+    const toastId = `plan-${row.productId}`;
+    const [state, formAction, pending] = useActionState(
+        async (previous: DailyPlanFormState, formData: FormData) => {
+            const next = await updateDailyPlanAction(previous, formData);
+            const message = errorMessage(next);
+            if (message) {
+                // Stays until dismissed or replaced: the message may hold numbers to compare.
+                toast.error(`${row.productName}: plán neuložen`, {
+                    id: toastId,
+                    description: message,
+                    duration: Infinity,
+                });
+            } else if (next.saved) {
+                toast.success(`${row.productName}: uloženo`, {
+                    id: toastId,
+                    description: undefined,
+                    duration: undefined,
+                });
+            }
+            return next;
+        },
+        INITIAL_STATE,
+    );
     const formId = `plan-${row.productId}`;
     const storedPlanKey = `${row.capacity}:${row.walkInQuantity}`;
-    const message = errorMessage(state);
+    const initialValues: Record<DailyPlanField, string> = {
+        capacity: state.values?.capacity ?? String(row.capacity),
+        walkInQuantity: state.values?.walkInQuantity ?? String(row.walkInQuantity),
+    };
+    // What the admin typed, valid only until the inputs start over for a new stored plan.
+    const [draft, setDraft] = useState<{
+        planKey: string;
+        values: Record<DailyPlanField, string>;
+    } | null>(null);
+    const values = draft?.planKey === storedPlanKey ? draft.values : initialValues;
+    const setValue = (field: DailyPlanField) => (value: string) =>
+        setDraft({ planKey: storedPlanKey, values: { ...values, [field]: value } });
+    const changed =
+        differsFromStored(values.capacity, row.capacity) ||
+        differsFromStored(values.walkInQuantity, row.walkInQuantity);
     return (
         <tr>
             <ProductCell row={row} />
@@ -128,9 +168,9 @@ const EditableRow = ({ row, date }: { row: DailyProductionRow; date: string }) =
                     field="capacity"
                     label={`Kapacita – ${row.productName}`}
                     formId={formId}
-                    defaultValue={state.values?.capacity ?? String(row.capacity)}
+                    defaultValue={initialValues.capacity}
                     state={state}
-                    onChange={markEdited}
+                    onChange={setValue('capacity')}
                 />
             </td>
             <SharedCells row={row} />
@@ -140,40 +180,25 @@ const EditableRow = ({ row, date }: { row: DailyProductionRow; date: string }) =
                     field="walkInQuantity"
                     label={`Pultový prodej – ${row.productName}`}
                     formId={formId}
-                    defaultValue={state.values?.walkInQuantity ?? String(row.walkInQuantity)}
+                    defaultValue={initialValues.walkInQuantity}
                     state={state}
-                    onChange={markEdited}
+                    onChange={setValue('walkInQuantity')}
                 />
             </td>
             <ResultCells row={row} />
             <td className="px-4 py-3">
-                <form
-                    id={formId}
-                    action={formAction}
-                    onSubmit={() => setEditedSinceSubmit(false)}
-                    className="flex flex-col items-end gap-1"
-                >
+                <form id={formId} action={formAction} className="flex justify-end">
                     <input type="hidden" name="productId" value={row.productId} />
                     <input type="hidden" name="date" value={date} />
                     <input type="hidden" name="expectedCapacity" value={row.capacity} />
                     <input type="hidden" name="expectedWalkInQuantity" value={row.walkInQuantity} />
-                    <button type="submit" disabled={pending} className={SECONDARY_BUTTON_CLASSES}>
+                    <button
+                        type="submit"
+                        disabled={pending || !changed}
+                        className={SECONDARY_BUTTON_CLASSES}
+                    >
                         Uložit<span className="sr-only"> {row.productName}</span>
                     </button>
-                    {message && (
-                        <p
-                            id={`${formId}-error`}
-                            role="alert"
-                            className="w-48 text-sm text-red-800"
-                        >
-                            {message}
-                        </p>
-                    )}
-                    {state.saved && !pending && !editedSinceSubmit && (
-                        <p role="status" className="text-sm text-green-800">
-                            Uloženo
-                        </p>
-                    )}
                 </form>
             </td>
         </tr>

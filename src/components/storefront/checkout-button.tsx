@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Notice } from '@/components/ui/notice';
 import { canSubmitCart, reviewCart } from '@/lib/cart/cart';
 import { buildReservationPayload } from '@/lib/cart/checkout';
@@ -37,8 +36,8 @@ const getDisabledHint = (catalog: CartCatalog, canSubmit: boolean): string | nul
 
 /**
  * Sends the reservation. Disabled while the date's catalog is unknown or the cart has flagged
- * lines; invalid contact details are shown on click instead, so the customer learns what is
- * missing.
+ * lines; invalid contact details are flagged on their fields on click instead, so the customer
+ * learns what is missing.
  */
 export const CheckoutButton = ({
     catalog,
@@ -51,7 +50,6 @@ export const CheckoutButton = ({
     const { cart } = useCart();
     const { customer, markTouched } = useCustomer();
     const { submitting, failure, submit } = useCheckout();
-    const [showCustomerError, setShowCustomerError] = useState(false);
     if (cart.length === 0) {
         return null;
     }
@@ -69,10 +67,8 @@ export const CheckoutButton = ({
         if (hasCustomerErrors) {
             markTouched('name');
             markTouched('phone');
-            setShowCustomerError(true);
             return;
         }
-        setShowCustomerError(false);
         void submit(buildReservationPayload(pickupDate, customer, cart));
     };
 
@@ -89,9 +85,6 @@ export const CheckoutButton = ({
                 {submitting ? 'Odesíláme…' : 'Odeslat rezervaci'}
             </button>
             {hint && <p className="text-sm text-stone-600">{hint}</p>}
-            {showCustomerError && hasCustomerErrors && (
-                <Notice tone="warning">Doplňte prosím kontaktní údaje.</Notice>
-            )}
             {currentFailure && (
                 <Notice tone="warning">
                     {FAILURE_MESSAGES[currentFailure.kind](currentFailure)}

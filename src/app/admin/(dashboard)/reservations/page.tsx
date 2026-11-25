@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { DateNavigation } from '@/components/admin/date-navigation';
+import { DateTransitionContent, DateTransitionProvider } from '@/components/admin/date-transition';
 import { ReservationList } from '@/components/admin/reservation-list';
 import { PRIMARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
@@ -33,44 +34,51 @@ const ReservationsContent = async ({ searchParams }: { searchParams: SearchParam
     );
 
     return (
-        <div className="flex flex-col gap-4">
-            {/* Keyed so the date input shows the new date after link navigation. */}
-            <DateNavigation
-                key={date}
-                path={PATH}
-                date={date}
-                today={today}
-                label="Datum vyzvednutí"
-            />
-            <div className="flex flex-wrap items-center justify-between gap-4">
-                <h2 className="text-xl font-semibold text-amber-950">
-                    {formatLongDate(date)}
-                    {date === today && ' (dnes)'}
-                </h2>
-                {canBook && (
+        <DateTransitionProvider>
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    {/* Keyed so the date input shows the new date after link navigation. */}
+                    <DateNavigation
+                        key={date}
+                        path={PATH}
+                        date={date}
+                        today={today}
+                        label="Datum vyzvednutí"
+                    />
+                    {/* Without a bookable date, the form opens on the first bookable day. */}
                     <Link
-                        href={`/admin/reservations/new?date=${date}`}
+                        href={
+                            canBook
+                                ? `/admin/reservations/new?date=${date}`
+                                : '/admin/reservations/new'
+                        }
                         className={PRIMARY_BUTTON_CLASSES}
                     >
                         Nová telefonická rezervace
                     </Link>
-                )}
+                </div>
+                <DateTransitionContent>
+                    <h2 className="text-xl font-semibold text-amber-950">
+                        {formatLongDate(date)}
+                        {date === today && ' (dnes)'}
+                    </h2>
+                    {date < today && (
+                        <Notice>
+                            Datum vyzvednutí už proběhlo: rezervace lze ještě označit jako
+                            vyzvednuté nebo nevyzvednuté, ale ne zrušit.
+                        </Notice>
+                    )}
+                    {reservations.length === 0 ? (
+                        <Notice>Na tento den nejsou žádné rezervace.</Notice>
+                    ) : (
+                        <ReservationList
+                            reservations={reservations}
+                            cancellationCutoff={getReservationCutoff(date).toISOString()}
+                        />
+                    )}
+                </DateTransitionContent>
             </div>
-            {date < today && (
-                <Notice>
-                    Datum vyzvednutí už proběhlo: rezervace lze ještě označit jako vyzvednuté nebo
-                    nevyzvednuté, ale ne zrušit.
-                </Notice>
-            )}
-            {reservations.length === 0 ? (
-                <Notice>Na tento den nejsou žádné rezervace.</Notice>
-            ) : (
-                <ReservationList
-                    reservations={reservations}
-                    cancellationCutoff={getReservationCutoff(date).toISOString()}
-                />
-            )}
-        </div>
+        </DateTransitionProvider>
     );
 };
 
