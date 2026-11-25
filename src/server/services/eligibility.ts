@@ -16,6 +16,7 @@ import {
     listPickupDates,
     type BakerySchedule,
     type PickupDateOption,
+    type PlanDateRejectionReason,
 } from '@/server/domain/reservation-rules';
 
 export type OfferedProduct = { id: string; name: string; price: number };
@@ -69,19 +70,31 @@ export const assertPickupDateAvailable = async (
     }
 };
 
+/**
+ * Why plans for the date cannot be changed now (outside the planning window, today through
+ * today+7, or a closed day), or `null` when they can.
+ */
+export const getPlanDateRejection = async (
+    db: DbExecutor,
+    date: string,
+    now: Date,
+): Promise<PlanDateRejectionReason | null> => {
+    if (!isValidCalendarDate(date)) {
+        return 'INVALID_DATE';
+    }
+    const dateCheck = checkPlanDate({ date, now, schedule: await loadSchedule(db, date) });
+    return dateCheck.ok ? null : dateCheck.reason;
+};
+
 /** Rejects dates outside the planning window (today through today+7) or on closed days. */
 export const assertPlanDateAvailable = async (
     db: DbExecutor,
     date: string,
     now: Date,
 ): Promise<void> => {
-    if (!isValidCalendarDate(date)) {
-        throw new PickupDateUnavailableError('INVALID_DATE');
-    }
-    const schedule = await loadSchedule(db, date);
-    const dateCheck = checkPlanDate({ date, now, schedule });
-    if (!dateCheck.ok) {
-        throw new PickupDateUnavailableError(dateCheck.reason);
+    const rejection = await getPlanDateRejection(db, date, now);
+    if (rejection) {
+        throw new PickupDateUnavailableError(rejection);
     }
 };
 

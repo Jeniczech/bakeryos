@@ -160,14 +160,14 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 
 - [x] Configure Auth.js Credentials with Argon2id and seeded admin.
 - [x] Add PostgreSQL-backed rate limiting to login attempts.
-- [ ] Protect server-side reads and **every** admin Server Action.
+- [x] Protect server-side reads and **every** admin Server Action.
 - [x] Build reservation list filtered by pickup date.
 - [x] Build manual phone reservation form using `createReservation()` with trusted `admin` source.
 - [x] Implement picked-up, cancelled, and no-show actions with valid transitions.
 - [x] Build product create/edit/deactivate forms.
 - [x] Invalidate the `catalog` cache tag on product, weekday, opening-day and closure changes. Only product changes exist so far; the weekday, opening-day and closure editors are deferred.
-- [ ] Build production table showing active reserved, retained late-cancelled, walk-in, recommended production, and availability.
-- [ ] Build daily capacity/walk-in override form.
+- [x] Build production table showing active reserved, retained late-cancelled, walk-in, recommended production, and availability.
+- [x] Build daily capacity/walk-in override form.
 
 ### Acceptance criteria
 

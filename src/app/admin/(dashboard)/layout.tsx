@@ -33,6 +33,9 @@ const DashboardLayout = ({ children }: LayoutProps<'/admin'>) => (
                     <Link href="/admin/reservations" className="font-medium text-amber-950">
                         Rezervace
                     </Link>
+                    <Link href="/admin/production" className="font-medium text-amber-950">
+                        Výroba
+                    </Link>
                     <Link href="/admin/products" className="font-medium text-amber-950">
                         Produkty
                     </Link>
