@@ -10,6 +10,7 @@ import {
     type ReservationPayload,
     type SubmitFailureKind,
 } from '@/lib/cart/checkout';
+import { readProblemCode } from '@/lib/http/problem-code';
 import { useClearCart } from './cart-provider';
 import { readStoredAttempt, storeAttempt, storeConfirmation } from './checkout-storage';
 
@@ -28,11 +29,6 @@ type CheckoutContextValue = {
 };
 
 const CheckoutContext = createContext<CheckoutContextValue | null>(null);
-
-const readProblemCode = (body: unknown): string | null =>
-    typeof body === 'object' && body !== null && 'code' in body && typeof body.code === 'string'
-        ? body.code
-        : null;
 
 /**
  * Sends reservations from the order layout, so a submission and its double-submit guard
