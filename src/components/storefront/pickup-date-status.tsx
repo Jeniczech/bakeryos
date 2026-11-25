@@ -8,7 +8,7 @@ import { PICKUP_DATE_MESSAGES } from './pickup-date-messages';
  * The online pickup dates, loaded once per request and shared by the date picker and the
  * status. Callers must `await connection()` first, because this reads the clock.
  */
-export const getOnlinePickupDates = cache(() => getPickupDates('online'));
+export const getOnlinePickupDates = cache(() => getPickupDates());
 
 /** Warns when the selected date cannot be booked online right now; renders nothing otherwise. */
 export const PickupDateStatus = async ({ pickupDate }: { pickupDate: string }) => {

@@ -83,8 +83,8 @@ The following rules must never be violated:
 1. Product/date capacity must never be oversold.
 2. Capacity-affecting writes must use PostgreSQL transactions and consistent row-level locking.
 3. Multi-product reservations must be atomic.
-4. Public reservations must respect the previous-day 18:00 cutoff in `Europe/Prague`.
-5. Administrators may bypass the cutoff, but never capacity constraints.
+4. Every reservation, online or phone, must respect the previous-day 18:00 cutoff in `Europe/Prague`.
+5. Administrators may cancel after the cutoff and edit today's daily plan, but never bypass capacity constraints.
 6. Early cancellations release capacity.
 7. Late administrative cancellations retain production commitments.
 8. Reservation creation must be idempotent.

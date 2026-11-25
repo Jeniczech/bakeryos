@@ -9,13 +9,13 @@ import {
 } from '@/server/domain/errors';
 import {
     checkPickupDate,
+    checkPlanDate,
     checkProductOffered,
     getBookingWindow,
     isBakeryOpen,
     listPickupDates,
     type BakerySchedule,
     type PickupDateOption,
-    type ReservationSource,
 } from '@/server/domain/reservation-rules';
 
 export type OfferedProduct = { id: string; name: string; price: number };
@@ -52,11 +52,10 @@ export const groupWeekdaysByProduct = (
     return weekdaysByProduct;
 };
 
-/** Rejects dates outside the source's booking window, after its cutoff, or on closed days. */
+/** Rejects dates outside the booking window, after their cutoff, or on closed days. */
 export const assertPickupDateAvailable = async (
     db: DbExecutor,
     pickupDate: string,
-    source: ReservationSource,
     now: Date,
 ): Promise<void> => {
     // Checked before querying, where an impossible date would fail as a SQL error.
@@ -64,7 +63,23 @@ export const assertPickupDateAvailable = async (
         throw new PickupDateUnavailableError('INVALID_DATE');
     }
     const schedule = await loadSchedule(db, pickupDate);
-    const dateCheck = checkPickupDate({ pickupDate, source, now, schedule });
+    const dateCheck = checkPickupDate({ pickupDate, now, schedule });
+    if (!dateCheck.ok) {
+        throw new PickupDateUnavailableError(dateCheck.reason);
+    }
+};
+
+/** Rejects dates outside the planning window (today through today+7) or on closed days. */
+export const assertPlanDateAvailable = async (
+    db: DbExecutor,
+    date: string,
+    now: Date,
+): Promise<void> => {
+    if (!isValidCalendarDate(date)) {
+        throw new PickupDateUnavailableError('INVALID_DATE');
+    }
+    const schedule = await loadSchedule(db, date);
+    const dateCheck = checkPlanDate({ date, now, schedule });
     if (!dateCheck.ok) {
         throw new PickupDateUnavailableError(dateCheck.reason);
     }
@@ -74,15 +89,12 @@ export const assertPickupDateAvailable = async (
 export const isBakeryOpenOn = async (db: DbExecutor, date: string): Promise<boolean> =>
     isBakeryOpen(date, await loadSchedule(db, date));
 
-/** The source's booking window, with the reason each unavailable date cannot be booked. */
-export const getPickupDates = async (
-    source: ReservationSource,
-    now: Date = new Date(),
-): Promise<PickupDateOption[]> => {
+/** The booking window, with the reason each unavailable date cannot be booked. */
+export const getPickupDates = async (now: Date = new Date()): Promise<PickupDateOption[]> => {
     const db = getDb();
-    const { firstDate, lastDate } = getBookingWindow(source, getPragueDate(now));
+    const { firstDate, lastDate } = getBookingWindow(getPragueDate(now));
     const schedule = await loadSchedule(db, firstDate, lastDate);
-    return listPickupDates({ source, now, schedule });
+    return listPickupDates({ now, schedule });
 };
 
 /** Returns the products in the order of `productIds`, or rejects every unavailable one at once. */

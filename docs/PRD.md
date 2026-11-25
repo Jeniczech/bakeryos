@@ -42,9 +42,9 @@ Payment occurs at pickup. There are no customer accounts, emails, or SMS notific
 ### 4.1 Dates and cutoff
 
 - Pickup date is selected **before** the product catalog.
-- Online pickup dates range from **tomorrow through today + 7 days** (Prague calendar), subject to bakery opening days and exceptional closures.
-- The online booking cutoff is **18:00 on the previous calendar day**, in the `Europe/Prague` timezone.
-- Online reservations cannot be made after that cutoff, including on the pickup date itself.
+- Pickup dates range from **tomorrow through today + 7 days** (Prague calendar), subject to bakery opening days and exceptional closures.
+- The booking cutoff is **18:00 on the previous calendar day**, in the `Europe/Prague` timezone, when production for the day is planned.
+- Reservations, online or by phone, cannot be made after that cutoff, including on the pickup date itself.
 - No pickup time slots: customers collect during opening hours.
 - Products may have configured production weekdays.
 
@@ -88,8 +88,8 @@ Payment occurs at pickup. There are no customer accounts, emails, or SMS notific
 - View reservations by pickup date.
 - See customer name, phone, items, totals, source, and status.
 - Create a reservation manually for a customer who phones the bakery.
-- **Admin may create a reservation after the online cutoff, including for pickup today, but not for a past pickup date.** Admin pickup dates range from **today through today + 7 days**.
-- Admin manual reservations still obey bakery opening days, product weekdays, and all capacity constraints. Online per-order quantity limits do not apply to admin reservations.
+- **Phone reservations follow the same date rules as online reservations:** tomorrow through today + 7 days, and not after the previous-day 18:00 cutoff. Same-day and other late phone orders are not taken in the system, because that day's production is already planned; spare units are sold over the counter as walk-in stock.
+- Admin manual reservations obey bakery opening days, product weekdays, and all capacity constraints. Online per-order quantity limits do not apply to admin reservations.
 - Mark a confirmed reservation as `picked_up`, `cancelled`, or `no_show`.
 - No editing existing reservations: cancel and recreate instead.
 - `picked_up` and `no_show` are only available on or after pickup date.
@@ -202,7 +202,7 @@ The interface should be mobile-friendly, accessible, simple, and visually warm, 
 5. **Early cancellation:** A customer cancels before cutoff; capacity is released.
 6. **Late customer cancellation:** Cancellation at or after cutoff is rejected.
 7. **Late admin cancellation:** Admin cancels after cutoff; committed production quantity does not decrease.
-8. **Late phone order:** Admin creates a reservation after cutoff when capacity remains; an over-capacity order is rejected.
+8. **Phone order:** Admin creates a reservation before cutoff when capacity remains; an over-capacity order or one after cutoff is rejected.
 9. **Daily plan override:** Admin cannot reduce capacity below walk-in allocation plus existing commitments.
 10. **Product changes:** Old reservations retain their original product names and prices.
 11. **Admin protection:** Unauthenticated users cannot read or modify administrative data.

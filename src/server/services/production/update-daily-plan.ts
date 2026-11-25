@@ -14,11 +14,7 @@ import {
     toValidationIssues,
 } from '@/server/domain/errors';
 import { buildDailyProductionItem, type DailyProductionItem } from '@/server/domain/production';
-import {
-    assertPickupDateAvailable,
-    loadOfferedProducts,
-    type OfferedProduct,
-} from '../eligibility';
+import { assertPlanDateAvailable, loadOfferedProducts, type OfferedProduct } from '../eligibility';
 
 export type UpdateDailyPlanInput = {
     productId: string;
@@ -40,7 +36,7 @@ const parseInput = (input: UpdateDailyPlanInput): DailyPlanUpdate => {
 
 /**
  * Past plans are production history; editing them would rewrite what was planned. Beyond
- * that, the date must be in the admin booking window and open, and the product offered.
+ * that, the date must be in the planning window and open, and the product offered.
  */
 const assertPlanEditable = async (
     tx: Transaction,
@@ -53,7 +49,7 @@ const assertPlanEditable = async (
             'The daily plan update is invalid.',
         );
     }
-    await assertPickupDateAvailable(tx, update.date, 'admin', now);
+    await assertPlanDateAvailable(tx, update.date, now);
     try {
         const [product] = await loadOfferedProducts(tx, [update.productId], update.date);
         return product;
@@ -101,8 +97,8 @@ const updateInTransaction = async (
  * Overrides one product/date's capacity and walk-in quantity under the shared locking
  * protocol (TDD §6.6): check eligibility, materialize and lock the plan, re-check
  * eligibility and read committed quantities after the lock, and reject any plan that would
- * no longer cover walk-ins plus commitments. Allowed after the online cutoff and for today,
- * never for past dates or outside the admin booking window. Callers must authorize the
+ * no longer cover walk-ins plus commitments. Allowed after the reservation cutoff and for
+ * today, never for past dates or outside the planning window (today through today+7). Callers must authorize the
  * administrator; `now` is injectable for tests and otherwise read at each check.
  */
 export const updateDailyPlan = async (

@@ -2,12 +2,13 @@ import Form from 'next/form';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { ReservationList } from '@/components/admin/reservation-list';
-import { SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
+import { PRIMARY_BUTTON_CLASSES, SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
 import { addDays, getPragueDate, isValidCalendarDate } from '@/lib/date-time/prague';
 import { formatLongDate } from '@/lib/formatting/dates';
 import { requireAdmin } from '@/server/auth/require-admin';
-import { getOnlineCutoff } from '@/server/domain/reservation-rules';
+import { getReservationCutoff } from '@/server/domain/reservation-rules';
+import { getPickupDates } from '@/server/services/eligibility';
 import { getDailyReservations } from '@/server/services/reservations/get-daily-reservations';
 
 type SearchParams = PageProps<'/admin/reservations'>['searchParams'];
@@ -55,16 +56,32 @@ const ReservationsContent = async ({ searchParams }: { searchParams: SearchParam
         typeof requestedDate === 'string' && isValidCalendarDate(requestedDate)
             ? requestedDate
             : today;
-    const reservations = await getDailyReservations(date, { now });
+    const [reservations, pickupDates] = await Promise.all([
+        getDailyReservations(date, { now }),
+        getPickupDates(now),
+    ]);
+    const canBook = pickupDates.some(
+        (option) => option.date === date && option.unavailableReason === null,
+    );
 
     return (
         <div className="flex flex-col gap-4">
             {/* Keyed so the date input shows the new date after link navigation. */}
             <DateNavigation key={date} date={date} today={today} />
-            <h2 className="text-xl font-semibold text-amber-950">
-                {formatLongDate(date)}
-                {date === today && ' (dnes)'}
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+                <h2 className="text-xl font-semibold text-amber-950">
+                    {formatLongDate(date)}
+                    {date === today && ' (dnes)'}
+                </h2>
+                {canBook && (
+                    <Link
+                        href={`/admin/reservations/new?date=${date}`}
+                        className={PRIMARY_BUTTON_CLASSES}
+                    >
+                        Nová telefonická rezervace
+                    </Link>
+                )}
+            </div>
             {date < today && (
                 <Notice>
                     Datum vyzvednutí už proběhlo: rezervace lze ještě označit jako vyzvednuté nebo
@@ -76,7 +93,7 @@ const ReservationsContent = async ({ searchParams }: { searchParams: SearchParam
             ) : (
                 <ReservationList
                     reservations={reservations}
-                    cancellationCutoff={getOnlineCutoff(date).toISOString()}
+                    cancellationCutoff={getReservationCutoff(date).toISOString()}
                 />
             )}
         </div>

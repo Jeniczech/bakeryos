@@ -29,8 +29,8 @@ afterAll(async () => {
 });
 
 describe('getPickupDates', () => {
-    it('lists the online window from tomorrow through today+7', async () => {
-        const dates = await getPickupDates('online', NOW);
+    it('lists the booking window from tomorrow through today+7', async () => {
+        const dates = await getPickupDates(NOW);
 
         expect(dates.map((option) => option.date)).toEqual([
             '2098-03-12',
@@ -49,16 +49,9 @@ describe('getPickupDates', () => {
             .insert(bakeryClosures)
             .values(TEST_CLOSURES.map((date) => ({ date, reason: 'Pickup dates test' })));
 
-        const dates = await getPickupDates('online', NOW);
+        const dates = await getPickupDates(NOW);
 
         expect(dates[0]).toEqual({ date: CLOSED_WEDNESDAY, unavailableReason: 'BAKERY_CLOSED' });
         expect(dates.map((option) => option.date)).not.toContain(WEDNESDAY_AFTER_WINDOW);
-    });
-
-    it('starts at today for admin', async () => {
-        const dates = await getPickupDates('admin', NOW);
-
-        expect(dates).toHaveLength(8);
-        expect(dates[0].date).toBe('2098-03-11');
     });
 });

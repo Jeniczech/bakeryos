@@ -84,12 +84,10 @@ See `PRD.md` for user journeys and acceptance scenarios.
 ### 4.1 Pickup dates and cutoff
 
 - Date is selected before browsing products.
-- Booking windows (Prague calendar dates, inclusive), on bakery-open dates and product-eligible weekdays:
-  - **Online:** `today + 1` through `today + 7`.
-  - **Admin:** `today` through `today + 7`.
-- **Online cutoff: 18:00 on the previous calendar day in `Europe/Prague`.** Thus same-day online reservations are never available.
-- Admin-created reservations may **bypass the online cutoff**, including booking for today, but cannot use a past pickup date.
-- Admin-created reservations still obey bakery-open dates, product weekdays, and all capacity constraints.
+- Booking window for every reservation source (Prague calendar dates, inclusive): `today + 1` through `today + 7`, on bakery-open dates and product-eligible weekdays.
+- **Cutoff: 18:00 on the previous calendar day in `Europe/Prague`**, for every source. Thus same-day reservations are never available. Production is planned at the cutoff, so a reservation taken later could claim units that will not be baked.
+- Admin-created reservations obey the same window, cutoff, bakery-open dates, product weekdays, and all capacity constraints; only the online quantity limits do not apply.
+- Daily plans use a separate planning window: `today` through `today + 7`, so admins can still adjust today's plan after the cutoff.
 - Source (`online` or `admin`) is assigned by trusted server code; public callers cannot choose `admin`.
 
 ### 4.2 Availability and production
@@ -261,7 +259,7 @@ Trusted input includes idempotency key, pickup date, customer name/phone, produc
 2. Compute canonical request hash from normalized fields **including trusted source**.
 3. Begin transaction and check existing idempotency key.
 4. If found: compare hashes; return existing confirmation or reject conflicting reuse.
-5. Validate the date against the source-specific booking window, bakery opening, product weekdays, and product activity. Apply cutoff **only for online source**.
+5. Validate the date against the booking window, cutoff, bakery opening, product weekdays, and product activity. These checks are the same for every source.
 6. Materialize and lock daily plans in deterministic order.
 7. Re-check the idempotency key, then re-read eligibility and aggregate committed quantities after locking. Read the clock again for this check: the lock wait may cross the cutoff.
 8. Validate the entire cart against capacity.
@@ -315,13 +313,13 @@ Both outcomes keep the items committed, so committed quantities do not change: t
 
 ### 6.6 `updateDailyPlan(input)`
 
-Authenticated admin only. Check eligibility (date and product, as for admin reservations); materialize and lock the plan; re-check eligibility after locking; aggregate committed quantities; reject if:
+Authenticated admin only. Check eligibility (date within the planning window and bakery-open, product active and offered; no cutoff); materialize and lock the plan; re-check eligibility after locking; aggregate committed quantities; reject if:
 
 ```text
 newCapacity < newWalkInQuantity + committedQuantity
 ```
 
-Then update the plan and commit. Admin may do this after cutoff and for today, but cannot violate commitments. Plans for past dates (before today in `Europe/Prague`) cannot be changed, because they are production history. The date must also be within the admin booking window (today through today + 7) and a bakery-open date, and the product must be active and offered on that weekday, so no plan is materialized for an ineligible product/date. The past-date check is repeated after locking, because the lock wait may cross midnight.
+Then update the plan and commit. Admin may do this after cutoff and for today, but cannot violate commitments. Plans for past dates (before today in `Europe/Prague`) cannot be changed, because they are production history. The date must also be within the planning window (today through today + 7) and a bakery-open date, and the product must be active and offered on that weekday, so no plan is materialized for an ineligible product/date. The past-date check is repeated after locking, because the lock wait may cross midnight.
 
 Returns the updated `DailyProductionItem`. Rejections use typed domain errors: `INVALID_REQUEST` (Zod validation, walk-in above capacity, or a past date), `OUTSIDE_BOOKING_WINDOW` and `BAKERY_CLOSED` (pickup-date errors), `PRODUCT_NOT_FOUND`, `PRODUCT_UNAVAILABLE` (inactive or not offered on that weekday), and `PLAN_BELOW_COMMITMENTS` (with the committed quantity).
 
@@ -500,7 +498,7 @@ Admin functions:
 - Product create/edit/deactivate; default daily capacity and walk-in allocation.
 - Daily production table and date-specific plan overrides.
 
-The manual reservation form may accept today's pickup date even after online cutoff, but still validates opening days, product weekdays, and capacity.
+The manual reservation form offers the same pickup dates as the storefront (tomorrow through today + 7, before cutoff) and validates opening days, product weekdays, and capacity. Online quantity limits do not apply.
 
 ## 10. Customer UI
 
@@ -548,7 +546,7 @@ Compute cutoff by taking the pickup date in the Prague calendar, moving to the *
 
 - Availability and production calculations.
 - Cutoff before/at/after 18:00.
-- Online and admin booking-window boundaries.
+- Booking-window and planning-window boundaries.
 - Online quantity limits and phone normalization.
 - Daylight-saving transitions.
 - Date/product eligibility.
@@ -566,9 +564,9 @@ Compute cutoff by taking the pickup date in the Prague calendar, moving to the *
 7. Early cancellation releases capacity.
 8. Customer cancellation at cutoff is rejected.
 9. Admin late cancellation retains production commitment.
-10. Admin reservation after cutoff succeeds if capacity remains.
-11. Admin reservation after cutoff fails when over capacity.
-12. Admin reservation for past date is rejected.
+10. Admin reservation before cutoff succeeds if capacity remains, without online quantity limits.
+11. Admin reservation fails when over capacity.
+12. Admin reservation after cutoff, for today, or for a past date is rejected.
 13. Reservation creation concurrent with capacity reduction.
 14. Cancellation concurrent with new reservation.
 15. Conflicting concurrent status updates.
@@ -615,7 +613,7 @@ Never commit real secrets.
 - Retries do not create duplicate reservations.
 - Customer cancellation works before cutoff and is blocked afterward.
 - Admin can authenticate, manage products, view reservations, create phone orders, update statuses, and edit daily plans.
-- Admin can book after online cutoff **without exceeding capacity**.
+- Admin phone orders follow the online date rules and **never exceed capacity**.
 - Early cancellations release capacity; late cancellations remain committed to production.
 - Production figures are correct.
 - Unit and integration tests pass; one Playwright customer flow passes.
