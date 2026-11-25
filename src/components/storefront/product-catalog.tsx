@@ -1,10 +1,12 @@
 import { cacheLife, cacheTag } from 'next/cache';
 import Image from 'next/image';
+import { Suspense } from 'react';
 import { Notice } from '@/components/ui/notice';
 import { formatLongDate, formatPragueDateTime } from '@/lib/formatting/dates';
 import { getOnlineCutoff } from '@/server/domain/reservation-rules';
 import { getPickupDates } from '@/server/services/eligibility';
 import { getOfferedProducts } from '@/server/services/products/get-offered-products';
+import { ProductAvailability, ProductAvailabilitySkeleton } from './product-availability';
 
 /**
  * The dates that can be booked online, cached so the catalog stays prefetchable. May lag the
@@ -22,7 +24,8 @@ const getCachedBookableDates = async (): Promise<string[]> => {
 
 /**
  * Product details change rarely, so they are cached per date and prefetched with the date
- * links. Admin product and schedule changes (Stage 6) should invalidate this tag.
+ * links. Admin product and schedule changes (Stage 6) should invalidate this tag. Prices are
+ * not rendered from here: `ProductAvailability` shows the current one per request.
  */
 const getCachedOfferedProducts = async (pickupDate: string) => {
     'use cache';
@@ -73,11 +76,20 @@ export const ProductCatalog = async ({ pickupDate }: { pickupDate: string }) => 
                                     />
                                 </div>
                             )}
-                            <div className="flex flex-col gap-1 p-4">
+                            <div className="flex flex-1 flex-col gap-1 p-4">
                                 <h3 className="font-semibold text-amber-950">{product.name}</h3>
                                 {product.description && (
                                     <p className="text-sm text-stone-600">{product.description}</p>
                                 )}
+                                <div className="mt-auto pt-2">
+                                    {/* A dynamic hole in the cached, prefetched card. */}
+                                    <Suspense fallback={<ProductAvailabilitySkeleton />}>
+                                        <ProductAvailability
+                                            pickupDate={pickupDate}
+                                            productId={product.id}
+                                        />
+                                    </Suspense>
+                                </div>
                             </div>
                         </li>
                     ))}
