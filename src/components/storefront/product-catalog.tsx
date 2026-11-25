@@ -1,10 +1,13 @@
 import { cacheLife, cacheTag } from 'next/cache';
 import Image from 'next/image';
+import { Suspense } from 'react';
 import { Notice } from '@/components/ui/notice';
 import { formatLongDate, formatPragueDateTime } from '@/lib/formatting/dates';
+import { formatPrice } from '@/lib/formatting/money';
 import { getOnlineCutoff } from '@/server/domain/reservation-rules';
 import { getPickupDates } from '@/server/services/eligibility';
 import { getOfferedProducts } from '@/server/services/products/get-offered-products';
+import { RemainingQuantity, RemainingQuantitySkeleton } from './remaining-quantity';
 
 /**
  * The dates that can be booked online, cached so the catalog stays prefetchable. May lag the
@@ -73,11 +76,25 @@ export const ProductCatalog = async ({ pickupDate }: { pickupDate: string }) => 
                                     />
                                 </div>
                             )}
-                            <div className="flex flex-col gap-1 p-4">
-                                <h3 className="font-semibold text-amber-950">{product.name}</h3>
+                            <div className="flex flex-1 flex-col gap-1 p-4">
+                                <div className="flex items-baseline justify-between gap-3">
+                                    <h3 className="font-semibold text-amber-950">{product.name}</h3>
+                                    <span className="shrink-0 font-semibold whitespace-nowrap text-amber-950">
+                                        {formatPrice(product.price)}
+                                    </span>
+                                </div>
                                 {product.description && (
                                     <p className="text-sm text-stone-600">{product.description}</p>
                                 )}
+                                <div className="mt-auto pt-2">
+                                    {/* A dynamic hole in the cached, prefetched card. */}
+                                    <Suspense fallback={<RemainingQuantitySkeleton />}>
+                                        <RemainingQuantity
+                                            pickupDate={pickupDate}
+                                            productId={product.id}
+                                        />
+                                    </Suspense>
+                                </div>
                             </div>
                         </li>
                     ))}
