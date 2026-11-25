@@ -112,7 +112,8 @@ capacity >= walkInQuantity + committedQuantity
 
 - Customer: `confirmed → cancelled` **strictly before cutoff** only; `retain_for_production = false`.
 - Admin: `confirmed → cancelled` before or after cutoff; set `retain_for_production = (cancelledAt >= cutoff)`.
-- Admin: `confirmed → picked_up` or `confirmed → no_show`, only on or after pickup date.
+- Admin: `confirmed → picked_up` or `confirmed → no_show`, only on the pickup date.
+- Admin cannot change reservations whose pickup date is in the past (before today in `Europe/Prague`): they are read-only history. This also applies to cancellation.
 - `picked_up`, `cancelled`, and `no_show` are terminal in the MVP.
 - Cancellation at the exact cutoff counts as late.
 - Early cancellation releases capacity; late cancellation retains the production commitment.
@@ -308,7 +309,9 @@ Retry only recognized transient database conflicts (deadlock, serialization fail
 
 ### 6.5 `updateReservationStatus(input)`
 
-Authenticated admin only. Allow `confirmed → picked_up` and `confirmed → no_show` on or after pickup date. Preserve production commitment. Ensure concurrent competing transitions cannot overwrite one another; use transactionally checked state and a conditional update or compatible row locking.
+Authenticated admin only. Allow `confirmed → picked_up` and `confirmed → no_show` on the pickup date. Preserve production commitment. Ensure concurrent competing transitions cannot overwrite one another; use transactionally checked state and a conditional update or compatible row locking.
+
+Both outcomes keep the items committed, so committed quantities do not change: the service locks only the reservation row (`SELECT ... FOR UPDATE`) and re-checks its status after locking, without daily-plan locks. A single lock cannot invert the plan-then-reservation order used by capacity-affecting writes. Setting the status the reservation already has is a no-op.
 
 ### 6.6 `updateDailyPlan(input)`
 
