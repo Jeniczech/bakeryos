@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { Toaster } from 'sonner';
 import { SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { requireAdmin } from '@/server/auth/require-admin';
 import { logOut } from './actions';
@@ -46,6 +47,7 @@ const DashboardLayout = ({ children }: LayoutProps<'/admin'>) => (
             </div>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+        <Toaster position="top-right" richColors closeButton />
     </>
 );
 
