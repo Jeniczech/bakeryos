@@ -158,8 +158,8 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 
 ### Tasks
 
-- [ ] Configure Auth.js Credentials with Argon2id and seeded admin.
-- [ ] Add PostgreSQL-backed rate limiting to login attempts.
+- [x] Configure Auth.js Credentials with Argon2id and seeded admin.
+- [x] Add PostgreSQL-backed rate limiting to login attempts.
 - [ ] Protect server-side reads and **every** admin Server Action.
 - [ ] Build reservation list filtered by pickup date.
 - [ ] Build manual phone reservation form using `createReservation()` with trusted `admin` source.
