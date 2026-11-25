@@ -164,8 +164,8 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Build reservation list filtered by pickup date.
 - [x] Build manual phone reservation form using `createReservation()` with trusted `admin` source.
 - [x] Implement picked-up, cancelled, and no-show actions with valid transitions.
-- [ ] Build product create/edit/deactivate forms.
-- [ ] Invalidate the `catalog` cache tag on product, weekday, opening-day and closure changes.
+- [x] Build product create/edit/deactivate forms.
+- [x] Invalidate the `catalog` cache tag on product, weekday, opening-day and closure changes. Only product changes exist so far; the weekday, opening-day and closure editors are deferred.
 - [ ] Build production table showing active reserved, retained late-cancelled, walk-in, recommended production, and availability.
 - [ ] Build daily capacity/walk-in override form.
 

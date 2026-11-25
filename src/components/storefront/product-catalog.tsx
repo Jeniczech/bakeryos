@@ -24,7 +24,7 @@ const getCachedBookableDates = async (): Promise<string[]> => {
 
 /**
  * Product details change rarely, so they are cached per date and prefetched with the date
- * links. Admin product and schedule changes (Stage 6) should invalidate this tag. Prices are
+ * links. Admin product changes invalidate this tag (schedule editors are deferred). Prices are
  * not rendered from here: `ProductAvailability` shows the current one per request.
  */
 const getCachedOfferedProducts = async (pickupDate: string) => {
