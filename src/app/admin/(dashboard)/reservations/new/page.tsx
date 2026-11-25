@@ -9,6 +9,7 @@ import {
 import { ManualReservationForm } from '@/components/admin/manual-reservation-form';
 import { ADMIN_PICKUP_DATE_MESSAGES } from '@/components/admin/pickup-date-messages';
 import { SECONDARY_BUTTON_CLASSES, SELECTED_BUTTON_CLASSES } from '@/components/ui/button-classes';
+import { LoadingNotice } from '@/components/ui/loading-notice';
 import { Notice } from '@/components/ui/notice';
 import { isValidCalendarDate, type CalendarDate } from '@/lib/date-time/prague';
 import { formatLongDate, formatShortDate } from '@/lib/formatting/dates';
@@ -121,7 +122,7 @@ const NewReservationPage = ({ searchParams }: PageProps<'/admin/reservations/new
                 ← Zpět na rezervace
             </Link>
         </div>
-        <Suspense fallback={<Notice>Načítáme nabídku…</Notice>}>
+        <Suspense fallback={<LoadingNotice>Načítáme nabídku…</LoadingNotice>}>
             <NewReservationContent searchParams={searchParams} />
         </Suspense>
     </section>
