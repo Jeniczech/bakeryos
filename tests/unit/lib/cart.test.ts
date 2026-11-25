@@ -88,6 +88,12 @@ describe('cartReducer', () => {
     });
 });
 
+describe('cartReducer clear', () => {
+    it('empties the cart', () => {
+        expect(cartReducer(setQuantity([], bread, 2), { type: 'clear' })).toEqual([]);
+    });
+});
+
 describe('getQuantityLimit', () => {
     it('reports no limit while the quantity can grow', () => {
         expect(getQuantityLimit(setQuantity([], bread, 9), bread)).toBeNull();

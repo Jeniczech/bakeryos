@@ -1,3 +1,4 @@
+import type { ReservationConfirmation } from '@/lib/cart/checkout';
 import type { CreateReservationResult } from '@/server/services/reservations/create-reservation';
 import type { ReservationDetails } from '@/server/services/reservations/get-reservation';
 
@@ -5,7 +6,10 @@ import type { ReservationDetails } from '@/server/services/reservations/get-rese
 export const buildManagementUrl = (origin: string, managementToken: string): string =>
     new URL(`/reservations/manage/${managementToken}`, origin).toString();
 
-export const toConfirmationBody = (result: CreateReservationResult, origin: string) => ({
+export const toConfirmationBody = (
+    result: CreateReservationResult,
+    origin: string,
+): ReservationConfirmation => ({
     reservationNumber: result.reservationNumber,
     pickupDate: result.pickupDate,
     status: result.status,
