@@ -287,9 +287,35 @@ describe('checkStatusTransition', () => {
                 ok: true,
                 retainForProduction: true,
             });
-            expect(transition('cancelled', 'admin', new Date('2026-11-26T09:00:00Z'))).toEqual({
+            expect(transition('cancelled', 'admin', new Date('2026-11-25T09:00:00Z'))).toEqual({
                 ok: true,
                 retainForProduction: true,
+            });
+        });
+    });
+
+    describe('past pickup dates', () => {
+        // Prague midnight ending the pickup date.
+        const dayAfterPickup = new Date('2026-11-25T23:00:00Z');
+
+        it('rejects admin cancellation once the pickup date has passed', () => {
+            expect(transition('cancelled', 'admin', dayAfterPickup)).toEqual({
+                ok: false,
+                reason: 'PICKUP_DATE_PASSED',
+            });
+        });
+
+        it.each(['picked_up', 'no_show'] as const)('still allows admin %s', (to) => {
+            expect(transition(to, 'admin', dayAfterPickup)).toEqual({
+                ok: true,
+                retainForProduction: false,
+            });
+        });
+
+        it('still reports the cutoff to a customer', () => {
+            expect(transition('cancelled', 'customer', dayAfterPickup)).toEqual({
+                ok: false,
+                reason: 'CUTOFF_PASSED',
             });
         });
     });

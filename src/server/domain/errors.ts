@@ -125,6 +125,7 @@ const STATUS_TRANSITION_MESSAGES: Record<StatusTransitionRejectionReason, string
     FORBIDDEN: 'This change is not allowed.',
     CUTOFF_PASSED: 'Reservations can only be cancelled online until 18:00 the day before pickup.',
     BEFORE_PICKUP_DATE: 'This status can only be set on or after the pickup date.',
+    PICKUP_DATE_PASSED: 'Reservations for past pickup dates can no longer be cancelled.',
 };
 
 export class StatusTransitionError extends DomainError {

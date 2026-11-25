@@ -104,7 +104,11 @@ export const checkProductOffered = (
 };
 
 export type StatusTransitionRejectionReason =
-    'INVALID_TRANSITION' | 'FORBIDDEN' | 'CUTOFF_PASSED' | 'BEFORE_PICKUP_DATE';
+    | 'INVALID_TRANSITION'
+    | 'FORBIDDEN'
+    | 'CUTOFF_PASSED'
+    | 'BEFORE_PICKUP_DATE'
+    | 'PICKUP_DATE_PASSED';
 
 export type StatusTransitionResult =
     { ok: true; retainForProduction: boolean } | Rejection<StatusTransitionRejectionReason>;
@@ -112,7 +116,9 @@ export type StatusTransitionResult =
 /**
  * Only `confirmed` reservations can change status. Customers may only cancel, strictly before
  * the cutoff. Admin cancellation at or after the cutoff retains the production commitment.
- * Pickup outcomes are admin-only and allowed from the pickup date onwards.
+ * Pickup outcomes are admin-only and allowed from the pickup date onwards, so a no-show can
+ * be recorded the next morning. An admin cannot cancel once the pickup date has passed: it
+ * would be late anyway and change nothing for production.
  */
 export const checkStatusTransition = (input: {
     from: ReservationStatus;
@@ -125,7 +131,11 @@ export const checkStatusTransition = (input: {
     if (from !== 'confirmed' || to === 'confirmed') {
         return { ok: false, reason: 'INVALID_TRANSITION' };
     }
+    const today = getPragueDate(now);
     if (to === 'cancelled') {
+        if (actor === 'admin' && pickupDate < today) {
+            return { ok: false, reason: 'PICKUP_DATE_PASSED' };
+        }
         const isLate = !isBeforeOnlineCutoff(pickupDate, now);
         if (actor === 'customer' && isLate) {
             return { ok: false, reason: 'CUTOFF_PASSED' };
@@ -135,8 +145,27 @@ export const checkStatusTransition = (input: {
     if (actor !== 'admin') {
         return { ok: false, reason: 'FORBIDDEN' };
     }
-    if (getPragueDate(now) < pickupDate) {
+    if (today < pickupDate) {
         return { ok: false, reason: 'BEFORE_PICKUP_DATE' };
     }
     return { ok: true, retainForProduction: false };
 };
+
+export const ADMIN_STATUS_TARGETS = ['picked_up', 'no_show', 'cancelled'] as const;
+export type AdminStatusTarget = (typeof ADMIN_STATUS_TARGETS)[number];
+
+/** The status changes an admin may make right now, in display order. */
+export const listAdminStatusTargets = (
+    reservation: { status: ReservationStatus; pickupDate: CalendarDate },
+    now: Date,
+): AdminStatusTarget[] =>
+    ADMIN_STATUS_TARGETS.filter(
+        (to) =>
+            checkStatusTransition({
+                from: reservation.status,
+                to,
+                actor: 'admin',
+                pickupDate: reservation.pickupDate,
+                now,
+            }).ok,
+    );
