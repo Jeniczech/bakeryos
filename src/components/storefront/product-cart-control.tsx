@@ -10,7 +10,7 @@ export const ProductCartControl = ({ product }: { product: CartProduct }) => {
     const { cart, dispatch } = useCart();
     const quantity = getCartQuantity(cart, product.productId);
     if (quantity > 0) {
-        return <QuantityStepper product={product} quantity={quantity} />;
+        return <QuantityStepper product={product} quantity={quantity} showLimit announce={false} />;
     }
     if (product.availableQuantity === 0) {
         return null;

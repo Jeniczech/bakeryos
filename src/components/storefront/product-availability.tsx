@@ -1,43 +1,7 @@
 import { connection } from 'next/server';
-import { cache } from 'react';
 import { formatPrice } from '@/lib/formatting/money';
-import { getDb } from '@/server/db/client';
-import {
-    listAvailableProducts,
-    type AvailableProduct,
-} from '@/server/services/products/get-available-products';
-import { getOnlinePickupDates } from './pickup-date-status';
+import { getLiveCatalog } from './live-catalog';
 import { ProductCartControl } from './product-cart-control';
-
-type LiveCatalog =
-    | { status: 'open'; products: Map<string, AvailableProduct> }
-    | { status: 'closed' }
-    | { status: 'failed' };
-
-/**
- * Current prices and remaining quantities for all catalog cards, loaded once per request.
- * The bookability check shares `PickupDateStatus`'s per-request date list. A failure only
- * blanks the cards' live details instead of replacing the page with an error.
- */
-const getLiveCatalog = cache(async (pickupDate: string): Promise<LiveCatalog> => {
-    try {
-        const dates = await getOnlinePickupDates();
-        const isBookable = dates.some(
-            (option) => option.date === pickupDate && option.unavailableReason === null,
-        );
-        if (!isBookable) {
-            return { status: 'closed' };
-        }
-        const products = await listAvailableProducts(getDb(), pickupDate);
-        return {
-            status: 'open',
-            products: new Map(products.map((product) => [product.id, product])),
-        };
-    } catch (error) {
-        console.error('Failed to load catalog availability', error);
-        return { status: 'failed' };
-    }
-});
 
 export const ProductAvailabilitySkeleton = () => (
     <span aria-hidden="true" className="block h-6 w-40 animate-pulse rounded bg-amber-100" />
@@ -87,7 +51,6 @@ export const ProductAvailability = async ({
                 product={{
                     productId: product.id,
                     name: product.name,
-                    unitPrice: product.price,
                     availableQuantity: product.remainingQuantity,
                 }}
             />

@@ -1,20 +1,20 @@
-import {
-    ONLINE_MAX_UNITS_PER_PRODUCT,
-    ONLINE_MAX_UNITS_PER_RESERVATION,
-} from '@/lib/validation/reservation';
+import { findOnlineQuantityLimitViolation } from '@/lib/validation/reservation';
 
-/** A product as last displayed in the catalog; price in haléře. */
-export type CartProduct = {
-    productId: string;
-    name: string;
-    unitPrice: number;
-    availableQuantity: number;
-};
+/**
+ * What the cart keeps per product. Prices and availability are never stored: they are read
+ * from the selected date's live catalog whenever the cart renders. The name is kept so lines
+ * whose product is not offered on the selected date can still be shown.
+ */
+export type CartLine = { productId: string; name: string; quantity: number };
 
-export type CartLine = CartProduct & { quantity: number };
-
-/** Lines in the order they were added. Display-only: the server prices and rechecks everything. */
+/** Lines in the order they were added. */
 export type Cart = readonly CartLine[];
+
+/** A product as currently displayed for the selected date. */
+export type CartProduct = { productId: string; name: string; availableQuantity: number };
+
+/** A product of the selected date's live catalog; price in haléře. */
+export type LiveProduct = CartProduct & { unitPrice: number };
 
 export type CartAction =
     | { type: 'setQuantity'; product: CartProduct; quantity: number }
@@ -25,63 +25,92 @@ export type QuantityLimit = 'AVAILABILITY' | 'PRODUCT_LIMIT' | 'RESERVATION_LIMI
 export const getCartQuantity = (cart: Cart, productId: string): number =>
     cart.find((line) => line.productId === productId)?.quantity ?? 0;
 
-export const getCartUnits = (cart: Cart): number =>
-    cart.reduce((sum, line) => sum + line.quantity, 0);
-
-export const getCartTotal = (cart: Cart): number =>
-    cart.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
-
-/** The binding limit and the most units of the product the cart may hold under it. */
-const getQuantityBound = (
-    cart: Cart,
-    product: CartProduct,
-): { limit: QuantityLimit; max: number } => {
-    const unitsOfOtherProducts = getCartUnits(cart) - getCartQuantity(cart, product.productId);
-    const bounds: { limit: QuantityLimit; max: number }[] = [
-        { limit: 'AVAILABILITY', max: product.availableQuantity },
-        { limit: 'PRODUCT_LIMIT', max: ONLINE_MAX_UNITS_PER_PRODUCT },
-        {
-            limit: 'RESERVATION_LIMIT',
-            max: ONLINE_MAX_UNITS_PER_RESERVATION - unitsOfOtherProducts,
-        },
-    ];
-    const tightest = bounds.reduce((lowest, bound) => (bound.max < lowest.max ? bound : lowest));
-    return { limit: tightest.limit, max: Math.max(0, tightest.max) };
-};
-
-/** The most units of the product the customer may have in the cart. */
-export const getMaxQuantity = (cart: Cart, product: CartProduct): number =>
-    getQuantityBound(cart, product).max;
-
-/** Why the product's quantity cannot be increased, or `null` if it can. */
-export const getQuantityLimit = (cart: Cart, product: CartProduct): QuantityLimit | null => {
-    const { limit, max } = getQuantityBound(cart, product);
-    return getCartQuantity(cart, product.productId) >= max ? limit : null;
+const withQuantity = (cart: Cart, product: CartProduct, quantity: number): Cart => {
+    if (quantity === 0) {
+        return cart.filter((line) => line.productId !== product.productId);
+    }
+    const line: CartLine = { productId: product.productId, name: product.name, quantity };
+    return getCartQuantity(cart, product.productId) === 0
+        ? [...cart, line]
+        : cart.map((existing) => (existing.productId === product.productId ? line : existing));
 };
 
 /**
- * Increases are capped at the displayed availability and the online limits. Decreases are
+ * Why the cart cannot hold `quantity` units of the product, or `null` if it can. The online
+ * limits come from the same check the server applies at submission.
+ */
+const findQuantityLimit = (
+    cart: Cart,
+    product: CartProduct,
+    quantity: number,
+): QuantityLimit | null => {
+    if (quantity > product.availableQuantity) {
+        return 'AVAILABILITY';
+    }
+    const violation = findOnlineQuantityLimitViolation(withQuantity(cart, product, quantity));
+    if (violation === null) {
+        return null;
+    }
+    return violation.reason === 'PRODUCT_LIMIT_EXCEEDED' ? 'PRODUCT_LIMIT' : 'RESERVATION_LIMIT';
+};
+
+/** Why one more unit of the product cannot be added, or `null` if it can. */
+export const getQuantityLimit = (cart: Cart, product: CartProduct): QuantityLimit | null =>
+    findQuantityLimit(cart, product, getCartQuantity(cart, product.productId) + 1);
+
+/**
+ * Increases beyond the displayed availability or the online limits are ignored. Decreases are
  * always allowed, even while the quantity is above a limit that has since dropped, so the
- * cart is never changed by more than the customer asked for.
+ * cart never changes by more than the customer asked for.
  */
 export const cartReducer = (cart: Cart, action: CartAction): Cart => {
     if (action.type === 'remove') {
         return cart.filter((line) => line.productId !== action.productId);
     }
-    const { product, quantity: requested } = action;
-    if (!Number.isInteger(requested)) {
+    const { product, quantity } = action;
+    if (!Number.isInteger(quantity) || quantity < 0) {
         return cart;
     }
-    const current = getCartQuantity(cart, product.productId);
-    const quantity = Math.max(
-        0,
-        Math.min(requested, Math.max(current, getMaxQuantity(cart, product))),
-    );
-    if (quantity === 0) {
-        return cart.filter((line) => line.productId !== product.productId);
+    const isIncrease = quantity > getCartQuantity(cart, product.productId);
+    if (isIncrease && findQuantityLimit(cart, product, quantity) !== null) {
+        return cart;
     }
-    const line: CartLine = { ...product, quantity };
-    return current === 0
-        ? [...cart, line]
-        : cart.map((existing) => (existing.productId === product.productId ? line : existing));
+    return withQuantity(cart, product, quantity);
+};
+
+export type CartLineIssue = 'NOT_OFFERED' | 'EXCEEDS_AVAILABILITY';
+
+export type ReviewedCartLine = {
+    line: CartLine;
+    /** `null` when the product cannot be reserved on the selected date. */
+    product: LiveProduct | null;
+    issue: CartLineIssue | null;
+};
+
+/**
+ * The cart checked against the selected date's live catalog. Lines are flagged, never changed.
+ * Units and total cover only lines offered on that date, at their current prices.
+ */
+export const reviewCart = (
+    cart: Cart,
+    products: readonly LiveProduct[],
+): { lines: ReviewedCartLine[]; units: number; total: number } => {
+    const productsById = new Map(products.map((product) => [product.productId, product]));
+    const lines = cart.map((line): ReviewedCartLine => {
+        const product = productsById.get(line.productId) ?? null;
+        if (product === null) {
+            return { line, product, issue: 'NOT_OFFERED' };
+        }
+        const issue = line.quantity > product.availableQuantity ? 'EXCEEDS_AVAILABILITY' : null;
+        return { line, product, issue };
+    });
+    let units = 0;
+    let total = 0;
+    for (const { line, product } of lines) {
+        if (product) {
+            units += line.quantity;
+            total += line.quantity * product.unitPrice;
+        }
+    }
+    return { lines, units, total };
 };

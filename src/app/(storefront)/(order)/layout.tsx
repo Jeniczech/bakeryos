@@ -1,7 +1,6 @@
 import { connection } from 'next/server';
 import { Suspense } from 'react';
 import { CartProvider } from '@/components/storefront/cart-provider';
-import { CartSummary } from '@/components/storefront/cart-summary';
 import {
     PickupDatePicker,
     type PickupDateChoice,
@@ -30,26 +29,21 @@ const PickupDates = async () => {
  */
 const OrderLayout = ({ children }: LayoutProps<'/'>) => (
     <CartProvider>
-        {/* On large screens the cart is a sticky sidebar; below that it follows the catalog. */}
-        <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-            <div className="flex flex-col gap-8">
-                <section className="flex flex-col gap-2">
-                    <h1 className="text-3xl font-semibold tracking-tight text-amber-950">
-                        Rezervujte si pečivo
-                    </h1>
-                    <p className="text-stone-600">
-                        Vyberte den vyzvednutí, zvolte chléb a pečivo a zaplaťte až při převzetí.
-                        Objednávky přijímáme do 18:00 předchozího dne.
-                    </p>
-                </section>
-                <Suspense fallback={<Notice>Načítáme dny vyzvednutí…</Notice>}>
-                    <PickupDates />
-                </Suspense>
-                {children}
-            </div>
-            <aside className="lg:sticky lg:top-6">
-                <CartSummary />
-            </aside>
+        <div className="flex flex-col gap-8">
+            <section className="flex flex-col gap-2">
+                <h1 className="text-3xl font-semibold tracking-tight text-amber-950">
+                    Rezervujte si pečivo
+                </h1>
+                <p className="text-stone-600">
+                    Vyberte den vyzvednutí, zvolte chléb a pečivo a zaplaťte až při převzetí.
+                    Objednávky přijímáme do 18:00 předchozího dne.
+                </p>
+            </section>
+            <Suspense fallback={<Notice>Načítáme dny vyzvednutí…</Notice>}>
+                <PickupDates />
+            </Suspense>
+            {/* Each page renders the cart beside its content, checked against its date. */}
+            {children}
         </div>
     </CartProvider>
 );
