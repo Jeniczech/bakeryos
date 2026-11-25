@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { createContext, use, useCallback, useMemo, useRef, useState } from 'react';
+import { createContext, startTransition, use, useCallback, useMemo, useRef, useState } from 'react';
 import {
     describeSubmitFailure,
     parseRetryAfterMinutes,
@@ -57,6 +57,7 @@ export const CheckoutProvider = ({ children }: { children: React.ReactNode }) =>
             );
             storeAttempt(attempt);
             const fail = (code: string | null, retryAfter: string | null = null) => {
+                setSubmitting(false);
                 const { kind, refreshCatalog } = describeSubmitFailure(code);
                 setFailure({
                     kind,
@@ -86,15 +87,20 @@ export const CheckoutProvider = ({ children }: { children: React.ReactNode }) =>
                 }
                 storeAttempt(null);
                 storeConfirmation(confirmation.data);
-                // Next may keep this layout mounted for back navigation: leave it empty.
-                clearCart();
-                router.push('/potvrzeni');
+                // One transition with the navigation: the locked cart stays on screen until the
+                // confirmation renders, instead of an empty, editable storefront in between.
+                // Next may keep this layout mounted for back navigation, so it is left empty.
+                startTransition(() => {
+                    clearCart();
+                    setSubmitting(false);
+                    router.push('/potvrzeni');
+                });
             } catch {
                 // A lost response may still have created the reservation; the retry reuses the key.
                 fail(null);
             } finally {
+                // The controls stay disabled through `submitting` until the transition commits.
                 inFlight.current = false;
-                setSubmitting(false);
             }
         },
         [router, clearCart],
