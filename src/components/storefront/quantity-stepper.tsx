@@ -1,7 +1,7 @@
 'use client';
 
 import { getQuantityLimit, type CartProduct } from '@/lib/cart/cart';
-import { useCart } from './cart-provider';
+import { useCartEditor } from './cart-provider';
 import { CART_CONTROL_ROW_CLASSES, LimitHint } from './limit-hint';
 
 const BUTTON_CLASSES =
@@ -13,17 +13,19 @@ const BUTTON_CLASSES =
  * card and in the cart, so only the cart's one announces changes.
  */
 export const QuantityStepper = ({
+    pickupDate,
     product,
     quantity,
     showLimit,
     announce,
 }: {
+    pickupDate: string | null;
     product: CartProduct;
     quantity: number;
     showLimit: boolean;
     announce: boolean;
 }) => {
-    const { cart, dispatch } = useCart();
+    const { cart, dispatch } = useCartEditor(pickupDate);
     const limit = getQuantityLimit(cart, product);
     const QuantityText = announce ? 'output' : 'span';
     const setQuantity = (next: number) =>

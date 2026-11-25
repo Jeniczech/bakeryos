@@ -29,7 +29,7 @@ const PickupDatePage = ({ params }: PageProps<'/den/[date]'>) => (
     <CartColumns
         cart={
             // Prices and availability are per request, like the cards' live details.
-            <Suspense fallback={<CartSummary catalog={{ status: 'loading' }} />}>
+            <Suspense fallback={<CartSummary catalog={{ status: 'loading' }} pickupDate={null} />}>
                 <DateCart params={params} />
             </Suspense>
         }

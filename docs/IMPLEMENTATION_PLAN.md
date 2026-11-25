@@ -142,7 +142,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [ ] Build confirmation screen with reservation number and management link.
 - [ ] Build reservation-management/cancellation screen.
 - [ ] Add loading, empty, error, and capacity-conflict states.
-- [ ] Revalidate cart on date changes without silently editing it.
+- [x] Revalidate cart on date changes without silently editing it.
 
 ### Acceptance criteria
 

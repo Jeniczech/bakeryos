@@ -48,6 +48,7 @@ export const ProductAvailability = async ({
                 )}
             </div>
             <ProductCartControl
+                pickupDate={pickupDate}
                 product={{
                     productId: product.id,
                     name: product.name,
