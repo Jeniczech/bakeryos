@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { DateNavigation } from '@/components/admin/date-navigation';
 import { DateTransitionContent, DateTransitionProvider } from '@/components/admin/date-transition';
 import { ProductionTable } from '@/components/admin/production-table';
+import { LoadingNotice } from '@/components/ui/loading-notice';
 import { Notice } from '@/components/ui/notice';
 import { getPragueDate, isValidCalendarDate } from '@/lib/date-time/prague';
 import { formatLongDate } from '@/lib/formatting/dates';
@@ -71,7 +72,7 @@ const ProductionContent = async ({ searchParams }: { searchParams: SearchParams 
 const ProductionPage = ({ searchParams }: PageProps<'/admin/production'>) => (
     <section className="flex flex-col gap-4">
         <h1 className="text-3xl font-semibold tracking-tight text-amber-950">Výroba</h1>
-        <Suspense fallback={<Notice>Načítáme výrobu…</Notice>}>
+        <Suspense fallback={<LoadingNotice>Načítáme výrobu…</LoadingNotice>}>
             <ProductionContent searchParams={searchParams} />
         </Suspense>
     </section>

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { ProductList } from '@/components/admin/product-list';
 import { PRIMARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
+import { LoadingNotice } from '@/components/ui/loading-notice';
 import { Notice } from '@/components/ui/notice';
 import { requireAdmin } from '@/server/auth/require-admin';
 import { listProducts } from '@/server/services/products/admin-products';
@@ -23,7 +24,7 @@ const ProductsPage = () => (
                 Nový produkt
             </Link>
         </div>
-        <Suspense fallback={<Notice>Načítáme produkty…</Notice>}>
+        <Suspense fallback={<LoadingNotice>Načítáme produkty…</LoadingNotice>}>
             <ProductsContent />
         </Suspense>
     </section>

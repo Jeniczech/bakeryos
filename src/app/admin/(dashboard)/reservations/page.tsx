@@ -4,6 +4,7 @@ import { DateNavigation } from '@/components/admin/date-navigation';
 import { DateTransitionContent, DateTransitionProvider } from '@/components/admin/date-transition';
 import { ReservationList } from '@/components/admin/reservation-list';
 import { PRIMARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
+import { LoadingNotice } from '@/components/ui/loading-notice';
 import { Notice } from '@/components/ui/notice';
 import { getPragueDate, isValidCalendarDate } from '@/lib/date-time/prague';
 import { formatLongDate } from '@/lib/formatting/dates';
@@ -85,7 +86,7 @@ const ReservationsContent = async ({ searchParams }: { searchParams: SearchParam
 const ReservationsPage = ({ searchParams }: PageProps<'/admin/reservations'>) => (
     <section className="flex flex-col gap-4">
         <h1 className="text-3xl font-semibold tracking-tight text-amber-950">Rezervace</h1>
-        <Suspense fallback={<Notice>Načítáme rezervace…</Notice>}>
+        <Suspense fallback={<LoadingNotice>Načítáme rezervace…</LoadingNotice>}>
             <ReservationsContent searchParams={searchParams} />
         </Suspense>
     </section>

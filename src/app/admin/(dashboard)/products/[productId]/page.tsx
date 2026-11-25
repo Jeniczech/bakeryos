@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { ProductForm } from '@/components/admin/product-form';
 import { SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
+import { LoadingNotice } from '@/components/ui/loading-notice';
 import { Notice } from '@/components/ui/notice';
 import { formatCrownsInput } from '@/lib/formatting/money';
 import { requireAdmin } from '@/server/auth/require-admin';
@@ -45,7 +46,7 @@ const EditProductPage = ({ params }: PageProps<'/admin/products/[productId]'>) =
                 ← Zpět na produkty
             </Link>
         </div>
-        <Suspense fallback={<Notice>Načítáme produkt…</Notice>}>
+        <Suspense fallback={<LoadingNotice>Načítáme produkt…</LoadingNotice>}>
             <EditProductContent params={params} />
         </Suspense>
     </section>

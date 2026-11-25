@@ -12,6 +12,20 @@
     --font-mono: var(--font-geist-mono);
 }
 
+/* Hidden for the delay, then fades in: fast loads never show it. */
+@theme {
+    --animate-delayed-fade-in: delayed-fade-in 150ms ease-out 300ms both;
+
+    @keyframes delayed-fade-in {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+}
+
 @media (prefers-color-scheme: dark) {
     :root {
         --background: #0a0a0a;
