@@ -1,14 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { formatShortDate } from '@/lib/formatting/dates';
 import type { PickupDateOption } from '@/server/domain/reservation-rules';
 import { PICKUP_DATE_LABELS } from './pickup-date-messages';
 
 export const PickupDatePicker = ({ dates }: { dates: readonly PickupDateOption[] }) => {
-    // Read on the client: search-param changes do not re-render the layout this lives in.
-    const selectedDate = useSearchParams().get('date');
+    // Read on the client: the layout this lives in does not re-render when the date changes.
+    const selectedDate = useParams<{ date?: string }>().date ?? null;
     return (
         <nav aria-labelledby="pickup-date-heading" className="flex flex-col gap-3">
             <h2 id="pickup-date-heading" className="text-lg font-semibold text-amber-950">
@@ -42,7 +42,7 @@ export const PickupDatePicker = ({ dates }: { dates: readonly PickupDateOption[]
                     return (
                         <li key={date}>
                             <Link
-                                href={{ pathname: '/', query: { date } }}
+                                href={`/den/${date}`}
                                 scroll={false}
                                 // Resolves each date's cached catalog before the click.
                                 prefetch

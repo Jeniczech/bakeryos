@@ -12,8 +12,8 @@ const PickupDates = async () => {
 };
 
 /**
- * Layouts do not re-render when only the search params change, so the date list loads once
- * per visit while the page below swaps the catalog for each `?date=`.
+ * Shared by `/` and `/den/[date]` and not re-rendered on a date switch, so the date list loads
+ * once per visit while the page below swaps the catalog for each date.
  */
 const OrderLayout = ({ children }: LayoutProps<'/'>) => (
     <div className="flex flex-col gap-8">

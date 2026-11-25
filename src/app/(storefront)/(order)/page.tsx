@@ -1,33 +1,7 @@
-import { Suspense } from 'react';
-import { PickupDateStatus } from '@/components/storefront/pickup-date-status';
-import { ProductCatalog } from '@/components/storefront/product-catalog';
 import { Notice } from '@/components/ui/notice';
 
-const SelectedDate = ({ date }: { date: string | undefined }) => {
-    if (date === undefined) {
-        return <Notice>Vyberte den vyzvednutí a ukážeme vám, co si můžete rezervovat.</Notice>;
-    }
-    return (
-        <div className="flex flex-col gap-4">
-            {/* Uncached and time-dependent; streams in after the cached catalog. Keyed by date so
-                a switch can show the prefetched catalog without waiting for this. */}
-            <Suspense key={date} fallback={null}>
-                <PickupDateStatus pickupDate={date} />
-            </Suspense>
-            {/* Keyed by date so each switch mounts a new boundary and shows the fallback. */}
-            <Suspense key={date} fallback={<Notice>Načítáme nabídku…</Notice>}>
-                <ProductCatalog pickupDate={date} />
-            </Suspense>
-        </div>
-    );
-};
-
-const OrderPage = ({ searchParams }: PageProps<'/'>) => (
-    <Suspense fallback={<Notice>Načítáme nabídku…</Notice>}>
-        {searchParams.then(({ date }) => (
-            <SelectedDate date={typeof date === 'string' ? date : undefined} />
-        ))}
-    </Suspense>
+const OrderPage = () => (
+    <Notice>Vyberte den vyzvednutí a ukážeme vám, co si můžete rezervovat.</Notice>
 );
 
 export default OrderPage;
