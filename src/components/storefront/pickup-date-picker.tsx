@@ -24,7 +24,7 @@ export const PickupDatePicker = ({ dates }: { dates: readonly PickupDateChoice[]
             <h2 id="pickup-date-heading" className="text-lg font-semibold text-amber-950">
                 Den vyzvednutí
             </h2>
-            <ul className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+            <ul className="grid auto-rows-fr grid-cols-4 gap-2 sm:grid-cols-7">
                 {dates.map(({ date, weekday, dayMonth, unavailableReason }) => {
                     const label = (
                         <>
