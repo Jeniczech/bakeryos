@@ -59,9 +59,12 @@ const ProductionContent = async ({ searchParams }: { searchParams: SearchParams 
                         <ProductionTable key={`table-${date}`} date={date} rows={production.rows} />
                     )}
                     <p className="text-sm text-stone-600">
-                        Upéct = rezervováno + zrušeno po uzávěrce + pultový prodej. Rezervace
-                        zrušené po uzávěrce zůstávají ve výrobě. Kapacitu nelze snížit pod pultový
-                        prodej a už rezervované kusy.
+                        Množství k upečení zahrnuje rezervované pečivo, rezervace zrušené po
+                        uzávěrce a plánovaný prodej na pultě.
+                    </p>
+                    <p className="text-sm text-stone-600">
+                        Rezervace zrušené po uzávěrce se již z výrobního plánu neodečítají. Kapacitu
+                        nelze snížit pod celkové plánované množství k upečení.
                     </p>
                 </DateTransitionContent>
             </div>
