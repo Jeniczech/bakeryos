@@ -8,7 +8,7 @@ import { readProblemCode } from '@/lib/http/problem-code';
 import { describeCancelFailure, type CancelFailureKind } from '@/lib/reservations/cancellation';
 
 const FAILURE_MESSAGES: Record<CancelFailureKind, string> = {
-    CUTOFF_PASSED: 'Rezervaci se nepodařilo zrušit: termín pro online zrušení už uplynul.',
+    CUTOFF_PASSED: 'Rezervaci se nepodařilo zrušit: termín pro online zrušení už uplynul. Pokud nemůžete přijít, zavolejte prosím do pekárny.',
     NOT_CANCELLABLE: 'Rezervaci se nepodařilo zrušit: její stav se mezitím změnil.',
     NOT_FOUND: 'Rezervaci se nepodařilo najít.',
     RETRY: 'Rezervaci se nepodařilo zrušit. Zkuste to prosím znovu.',

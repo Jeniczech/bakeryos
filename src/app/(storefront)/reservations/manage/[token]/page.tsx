@@ -33,7 +33,7 @@ const describeReservation = (
                 heading: 'Vaše rezervace',
                 cancellationNote: details.canCancel
                     ? `Rezervaci můžete zrušit do ${cutoff}. Upravit ji nelze, místo toho ji zrušte a vytvořte novou.`
-                    : `Online zrušení bylo možné do ${cutoff}. Pokud nemůžete přijít, dejte prosím vědět pekárně.`,
+                    : `Online zrušení bylo možné do ${cutoff}. Pokud nemůžete přijít, zavolejte prosím do pekárny.`,
             };
         case 'cancelled':
             return {
