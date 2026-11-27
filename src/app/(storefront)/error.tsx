@@ -1,6 +1,6 @@
 'use client';
 
-import { ErrorState } from '@/components/storefront/error-state';
+import { ErrorState } from '@/components/ui/error-state';
 
 /** Catches storefront failures the pages do not handle themselves, e.g. a database outage. */
 const StorefrontError = ({ error, retry }: { error: unknown; retry: () => void }) => (

@@ -207,14 +207,14 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 
 ### Tasks
 
-- [ ] Apply production migrations explicitly.
-- [ ] Seed safe demo catalog and admin credentials.
+- [x] Apply production migrations explicitly.
+- [x] Seed safe demo catalog and admin credentials.
 - [ ] Verify Netlify + Neon deployment.
 - [ ] Run production smoke tests for customer booking and admin login.
-- [ ] Review responsive UI, accessibility basics, and error handling.
-- [ ] Write README: setup, architecture, tests, deployment, assumptions, and tradeoffs.
+- [x] Review responsive UI, accessibility basics, and error handling.
+- [x] Write README: setup, architecture, tests, deployment, assumptions, and tradeoffs.
 - [ ] Prepare public URL, admin URL, and demo credentials.
-- [ ] Record known limitations and P1 follow-ups.
+- [x] Record known limitations and P1 follow-ups.
 
 ### Acceptance criteria
 

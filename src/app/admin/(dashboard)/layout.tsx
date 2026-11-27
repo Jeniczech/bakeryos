@@ -24,7 +24,10 @@ const DashboardLayout = ({ children }: LayoutProps<'/admin'>) => (
     <>
         <header className="border-b border-amber-200 bg-amber-100/60">
             <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3">
-                <nav aria-label="Administrace" className="flex items-center gap-6">
+                <nav
+                    aria-label="Administrace"
+                    className="flex flex-wrap items-center gap-x-6 gap-y-2"
+                >
                     <Link
                         href="/admin/reservations"
                         className="text-xl font-semibold tracking-tight text-amber-900"

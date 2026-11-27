@@ -16,6 +16,7 @@ export const ErrorState = ({
     heading,
     headingLevel: Heading,
     message,
+    homeHref = '/',
 }: {
     error: unknown;
     retry: () => void;
@@ -23,6 +24,7 @@ export const ErrorState = ({
     /** `h2` below a layout that already has the page's `h1`. */
     headingLevel: 'h1' | 'h2';
     message: string;
+    homeHref?: string;
 }) => {
     const headingId = useId();
     useEffect(() => {
@@ -41,7 +43,7 @@ export const ErrorState = ({
                 <button type="button" onClick={retry} className={SECONDARY_BUTTON_CLASSES}>
                     Zkusit znovu
                 </button>
-                <Link href="/" className={SECONDARY_BUTTON_CLASSES}>
+                <Link href={homeHref} className={SECONDARY_BUTTON_CLASSES}>
                     Zpět na úvod
                 </Link>
             </div>
