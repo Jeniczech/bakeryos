@@ -34,6 +34,22 @@ const toUtcMidnight = (date: CalendarDate): Date => new Date(`${date}T00:00:00Z`
 export const formatLongDate = (date: CalendarDate): string =>
     longDateFormatter.format(toUtcMidnight(date));
 
+// Feminine weekdays change after "na"; the masculine ones keep their nominative form.
+const ACCUSATIVE_WEEKDAYS: Readonly<Record<string, string>> = {
+    středa: 'středu',
+    sobota: 'sobotu',
+    neděle: 'neděli',
+};
+
+/** The long date after the preposition "na", e.g. "středu 25. listopadu". */
+export const formatLongDateAccusative = (date: CalendarDate): string =>
+    longDateFormatter
+        .formatToParts(toUtcMidnight(date))
+        .map((part) =>
+            part.type === 'weekday' ? (ACCUSATIVE_WEEKDAYS[part.value] ?? part.value) : part.value,
+        )
+        .join('');
+
 /** e.g. `{ weekday: 'st', dayMonth: '25. 11.' }`, for compact date pickers. */
 export const formatShortDate = (date: CalendarDate): { weekday: string; dayMonth: string } => ({
     weekday: weekdayFormatter.format(toUtcMidnight(date)),

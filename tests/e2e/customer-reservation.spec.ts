@@ -41,7 +41,7 @@ test('a customer books, opens the management link, and cancels', async ({ page }
     await page.getByRole('button', { name: 'Odeslat rezervaci' }).click();
 
     await expect(page).toHaveURL(/\/potvrzeni$/);
-    await expect(page.getByRole('heading', { name: 'Rezervace je hotová' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Vaše rezervace je potvrzena!' })).toBeVisible();
     await expectReservedItems(page);
 
     await page

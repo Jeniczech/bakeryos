@@ -8,7 +8,7 @@ const OrderPage = () => (
         cart={<CartSummary catalog={{ status: 'noDate' }} pickupDate={null} />}
         checkout={<CheckoutButton catalog={{ status: 'noDate' }} pickupDate={null} />}
     >
-        <Notice>Vyberte den vyzvednutí a ukážeme vám, co si můžete rezervovat.</Notice>
+        <Notice>Vyberte si den vyzvednutí a prohlédněte si nabídku pečiva.</Notice>
     </CartColumns>
 );
 

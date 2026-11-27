@@ -1,10 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { formatLongDate, formatPragueDateTime, formatShortDate } from '@/lib/formatting/dates';
+import {
+    formatLongDate,
+    formatLongDateAccusative,
+    formatPragueDateTime,
+    formatShortDate,
+} from '@/lib/formatting/dates';
 
 describe('formatLongDate', () => {
     it('formats the calendar date regardless of the runtime time zone', () => {
         expect(formatLongDate('2026-11-25')).toBe('středa 25. listopadu');
         expect(formatLongDate('2026-03-29')).toBe('neděle 29. března');
+    });
+});
+
+describe('formatLongDateAccusative', () => {
+    it('declines feminine weekdays and keeps masculine ones', () => {
+        expect(formatLongDateAccusative('2026-11-25')).toBe('středu 25. listopadu');
+        expect(formatLongDateAccusative('2026-11-28')).toBe('sobotu 28. listopadu');
+        expect(formatLongDateAccusative('2026-11-29')).toBe('neděli 29. listopadu');
+        expect(formatLongDateAccusative('2026-11-24')).toBe('úterý 24. listopadu');
+        expect(formatLongDateAccusative('2026-11-27')).toBe('pátek 27. listopadu');
     });
 });
 

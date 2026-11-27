@@ -70,7 +70,7 @@ const ReservationsContent = async ({ searchParams }: { searchParams: SearchParam
                         </Notice>
                     )}
                     {reservations.length === 0 ? (
-                        <Notice>Na tento den nejsou žádné rezervace.</Notice>
+                        <Notice>Pro tento den zatím nemáte žádné rezervace.</Notice>
                     ) : (
                         <ReservationList
                             reservations={reservations}
