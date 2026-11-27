@@ -33,7 +33,7 @@ A small bakery currently takes bread and pastry reservations over the phone. Sta
 4. Provide a required name and phone number.
 5. Submit the reservation; the server validates all items and confirms the whole cart or none of it.
 6. See a human-readable reservation number, itemized prices, total, pickup date, and private management URL.
-7. Optionally reopen the management URL and cancel before the cutoff.
+7. Optionally reopen the management URL and cancel, at the latest on the pickup date.
 
 Payment occurs at pickup. There are no customer accounts, emails, or SMS notifications.
 
@@ -64,7 +64,7 @@ Payment occurs at pickup. There are no customer accounts, emails, or SMS notific
 - Reservation is confirmed automatically if all rules pass.
 - Show reservation number, date, products, quantities, prices, total, and management URL.
 - A private, unguessable management URL allows viewing and cancelling the reservation.
-- Customers may cancel **strictly before** the cutoff; they cannot edit an existing reservation.
+- Customers may cancel until the end of the pickup date; they cannot edit an existing reservation.
 - No public reservation lookup by reservation number.
 
 ## 5. Administration requirements
@@ -135,8 +135,7 @@ The system must never accept a reservation or daily-plan edit that results in ne
 
 ### 6.2 Cancellation
 
-- Customer cancellation is allowed only while `confirmed` and before cutoff.
-- Admin may cancel a `confirmed` reservation before or after cutoff.
+- Customers and admins may cancel a `confirmed` reservation before or after cutoff, until the end of the pickup date. Customers cancel online, so they never need to phone the bakery.
 - Cancellation before cutoff releases reserved capacity.
 - Cancellation at or after cutoff retains production commitment, because production may already be planned or underway.
 - Late cancellation remains visible separately in the production view.
@@ -200,7 +199,7 @@ The interface should be mobile-friendly, accessible, simple, and visually warm, 
 3. **Concurrent final unit:** Two customers attempt to reserve the final unit; at most one succeeds.
 4. **Retry:** Resubmitting the same request does not create another reservation and returns the original confirmation.
 5. **Early cancellation:** A customer cancels before cutoff; capacity is released.
-6. **Late customer cancellation:** Cancellation at or after cutoff is rejected.
+6. **Late customer cancellation:** A customer cancels at or after cutoff; the cancellation succeeds and committed production quantity does not decrease.
 7. **Late admin cancellation:** Admin cancels after cutoff; committed production quantity does not decrease.
 8. **Phone order:** Admin creates a reservation before cutoff when capacity remains; an over-capacity order or one after cutoff is rejected.
 9. **Daily plan override:** Admin cannot reduce capacity below walk-in allocation plus existing commitments.

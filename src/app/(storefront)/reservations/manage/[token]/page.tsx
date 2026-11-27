@@ -31,14 +31,16 @@ const describeReservation = (
         case 'confirmed':
             return {
                 heading: 'Vaše rezervace',
-                cancellationNote: details.canCancel
-                    ? `Rezervaci můžete zrušit do ${cutoff}. Upravit ji nelze, místo toho ji zrušte a vytvořte novou.`
-                    : `Online zrušení bylo možné do ${cutoff}. Pokud nemůžete přijít, zavolejte prosím do pekárny.`,
+                cancellationNote: !details.canCancel
+                    ? 'Den vyzvednutí už skončil, rezervaci nelze zrušit.'
+                    : details.isPastCutoff
+                      ? 'Pečivo pro vás už máme naplánované. Pokud nemůžete přijít, rezervaci prosím zrušte, ať s vámi nepočítáme.'
+                      : `Rezervaci můžete zrušit do konce dne vyzvednutí, nejlépe do ${cutoff}, než naplánujeme pečení. Upravit ji nelze, místo toho ji zrušte a vytvořte novou.`,
             };
         case 'cancelled':
             return {
                 heading: 'Rezervace je zrušená',
-                cancellationNote: 'Pečivo pro vás nechystáme. Můžete si vytvořit novou rezervaci.',
+                cancellationNote: 'S vyzvednutím nepočítáme. Můžete si vytvořit novou rezervaci.',
             };
         case 'picked_up':
             return {
@@ -114,6 +116,7 @@ const ManagedReservation = async ({
                     token={token}
                     canCancel={details.canCancel}
                     cancellationCutoff={details.cancellationCutoff.toISOString()}
+                    cancellationDeadline={details.cancellationDeadline.toISOString()}
                 >
                     {cancellationNote}
                 </ReservationCancellation>

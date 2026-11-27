@@ -109,10 +109,9 @@ capacity >= walkInQuantity + committedQuantity
 
 ### 4.3 Cancellation and status transitions
 
-- Customer: `confirmed → cancelled` **strictly before cutoff** only; `retain_for_production = false`.
-- Admin: `confirmed → cancelled` before or after cutoff; set `retain_for_production = (cancelledAt >= cutoff)`.
+- Customer and admin: `confirmed → cancelled` before or after cutoff, until the end of the pickup date; set `retain_for_production = (cancelledAt >= cutoff)`.
 - Admin: `confirmed → picked_up` or `confirmed → no_show`, only on or after pickup date.
-- Admin cannot cancel a reservation whose pickup date is in the past (before today in `Europe/Prague`): the cancellation would be late anyway and change nothing for production.
+- Nobody can cancel a reservation whose pickup date is in the past (before today in `Europe/Prague`): the cancellation would be late anyway and change nothing for production.
 - `picked_up`, `cancelled`, and `no_show` are terminal in the MVP.
 - Cancellation at the exact cutoff counts as late.
 - Early cancellation releases capacity; late cancellation retains the production commitment.
@@ -298,7 +297,7 @@ Management tokens are bearer credentials. Do not log them, include them in analy
 3. Begin transaction, materialize and lock relevant daily plans in deterministic order.
 4. Re-read reservation state **after locks**; require `confirmed`.
 5. Read the current time **after the locks are acquired** (the lock wait may cross the cutoff) and calculate the exact cutoff for that pickup date in `Europe/Prague`.
-6. Reject customer cancellation at or after cutoff; admin cancellation is allowed.
+6. Reject cancellation once the pickup date has passed, for customers and admins alike.
 7. Set `status = cancelled`, `cancelled_at = now`, and `retain_for_production = (now >= cutoff)`.
 8. Commit.
 
@@ -455,7 +454,7 @@ Return reservation details and cancellation eligibility. Invalid tokens return `
 
 ### `POST /api/reservations/manage/:token/cancel`
 
-Cancel before cutoff; reject late customer cancellation with a domain conflict. Repeated cancellation is side-effect-free.
+Cancel until the end of the pickup date; a cancellation at or after cutoff retains the production commitment. A cancellation after the pickup date is rejected with a domain conflict. Repeated cancellation is side-effect-free.
 
 ### Admin mutations
 
@@ -571,7 +570,7 @@ Compute cutoff by taking the pickup date in the Prague calendar, moving to the *
 5. Same idempotency key + same payload returns original confirmation/link.
 6. Same idempotency key + different payload returns conflict.
 7. Early cancellation releases capacity.
-8. Customer cancellation at cutoff is rejected.
+8. Customer cancellation at cutoff succeeds and retains production commitment.
 9. Admin late cancellation retains production commitment.
 10. Admin reservation before cutoff succeeds if capacity remains, without online quantity limits.
 11. Admin reservation fails when over capacity.
@@ -620,7 +619,7 @@ Never commit real secrets.
 - Customers can reserve multiple products and receive a valid management link.
 - Concurrent requests cannot oversell the final unit.
 - Retries do not create duplicate reservations.
-- Customer cancellation works before cutoff and is blocked afterward.
+- Customer cancellation works until the end of the pickup date; after cutoff it retains production commitment.
 - Admin can authenticate, manage products, view reservations, create phone orders, update statuses, and edit daily plans.
 - Admin phone orders follow the online date rules and **never exceed capacity**.
 - Early cancellations release capacity; late cancellations remain committed to production.

@@ -38,7 +38,7 @@ A single Next.js application, with no separate backend:
 - **Capacity is protected by PostgreSQL row locks, not by checks in application memory.** Every write that affects a product's capacity for a date runs in one transaction. It first creates any missing `daily_product_plans` rows (`INSERT … ON CONFLICT DO NOTHING`), then locks them with `SELECT … FOR UPDATE` in ascending product-ID order so two transactions cannot deadlock. Only after it holds the locks does it re-read committed quantities, eligibility and the clock (waiting for a lock can cross the cutoff), and validate the whole cart. A cart either succeeds completely or nothing is written.
 - **Daily plans snapshot product defaults** on their first write, so later changes to a product's default capacity never rewrite a date that already has reservations.
 - **Reservation creation is idempotent.** The client sends a UUID key and the server stores a hash of the normalized request. A retry with the same request returns the original confirmation; the same key with a different request is a `409`. A unique constraint is the final guard against concurrent duplicates.
-- **Late cancellations stay in production.** Production is planned at the 18:00 cutoff, so an admin cancellation after it keeps `retain_for_production = true` and its units still count as committed. Customers can cancel only before the cutoff, which releases the units.
+- **Late cancellations stay in production.** Production is planned at the 18:00 cutoff, so a cancellation after it, by the customer or an admin, keeps `retain_for_production = true` and its units still count as committed. A cancellation before the cutoff releases the units. Customers can cancel online until the end of the pickup date, so they never need to phone the bakery.
 - **Phone reservations follow the same cutoff** as online ones, for the same reason: units reserved after the plan is made might never be baked. Only the online quantity limits (20 per product, 50 per reservation) do not apply.
 - **Prices come from the database** and are stored as integer haléře, with name and price snapshots on each reservation item.
 - **A custom admin instead of a CMS:** the admin is a few screens tied closely to the capacity rules, and a CMS such as Payload would add a second data model and its own write path.
@@ -98,12 +98,12 @@ The production view at `/admin/production` lists, per date, the products offered
 
 ## Public API
 
-| Endpoint                                      | Purpose                                                                                    |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `GET /api/products?date=YYYY-MM-DD`           | Online catalog for a pickup date with prices (haléře) and remaining quantity               |
-| `POST /api/reservations`                      | Create a reservation (`201`); same idempotency key and payload replays it (`200`)          |
-| `GET /api/reservations/manage/:token`         | Reservation details and whether the customer can still cancel                              |
-| `POST /api/reservations/manage/:token/cancel` | Customer cancellation, strictly before 18:00 Prague time the day before pickup; repeatable |
+| Endpoint                                      | Purpose                                                                                          |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `GET /api/products?date=YYYY-MM-DD`           | Online catalog for a pickup date with prices (haléře) and remaining quantity                     |
+| `POST /api/reservations`                      | Create a reservation (`201`); same idempotency key and payload replays it (`200`)                |
+| `GET /api/reservations/manage/:token`         | Reservation details and whether the customer can still cancel                                    |
+| `POST /api/reservations/manage/:token/cancel` | Customer cancellation until the end of the pickup date; late ones stay in production; repeatable |
 
 Request body for `POST /api/reservations` (TDD §8); any `source` or price fields are ignored:
 

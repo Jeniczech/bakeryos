@@ -3,6 +3,8 @@ import { getDb, type DbExecutor } from '@/server/db/client';
 import { reservationItems, reservations } from '@/server/db/schema';
 import { ReservationNotFoundError } from '@/server/domain/errors';
 import {
+    checkStatusTransition,
+    getCancellationDeadline,
     getReservationCutoff,
     isBeforeReservationCutoff,
     type ReservationStatus,
@@ -19,9 +21,14 @@ export type ReservationDetails = {
     customerName: string;
     totalPrice: number; // haléře
     items: ReservationConfirmationItem[];
+    /** From this instant a cancellation keeps the items in production. */
     cancellationCutoff: Date;
-    /** Whether the customer may still cancel: `confirmed` and strictly before the cutoff. */
+    /** Cancellation closes at this instant, when the pickup day ends. */
+    cancellationDeadline: Date;
+    /** Whether the customer may still cancel: `confirmed` and the pickup day has not ended. */
     canCancel: boolean;
+    /** Whether the cutoff has passed, so a cancellation now would keep the items in production. */
+    isPastCutoff: boolean;
 };
 
 /** Returns null for malformed and unknown tokens alike. */
@@ -66,9 +73,15 @@ const loadDetails = async (
         totalPrice: items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
         items: items.sort(compareConfirmationItems),
         cancellationCutoff: getReservationCutoff(reservation.pickupDate),
-        canCancel:
-            reservation.status === 'confirmed' &&
-            isBeforeReservationCutoff(reservation.pickupDate, now),
+        cancellationDeadline: getCancellationDeadline(reservation.pickupDate),
+        canCancel: checkStatusTransition({
+            from: reservation.status,
+            to: 'cancelled',
+            actor: 'customer',
+            pickupDate: reservation.pickupDate,
+            now,
+        }).ok,
+        isPastCutoff: !isBeforeReservationCutoff(reservation.pickupDate, now),
     };
 };
 

@@ -5,6 +5,7 @@ import {
     checkProductOffered,
     checkStatusTransition,
     getBookingWindow,
+    getCancellationDeadline,
     getPlanningWindow,
     getReservationCutoff,
     isBakeryOpen,
@@ -28,6 +29,21 @@ const alwaysOpen: BakerySchedule = {
     openWeekdays: new Set([0, 1, 2, 3, 4, 5, 6]),
     closures: new Set(),
 };
+
+describe('getCancellationDeadline', () => {
+    it('is Prague midnight ending the pickup date', () => {
+        expect(getCancellationDeadline('2026-11-25').toISOString()).toBe(
+            '2026-11-25T23:00:00.000Z',
+        );
+        expect(getCancellationDeadline('2026-07-02').toISOString()).toBe(
+            '2026-07-02T22:00:00.000Z',
+        );
+        // Clocks go back on Sunday 2026-10-25.
+        expect(getCancellationDeadline('2026-10-25').toISOString()).toBe(
+            '2026-10-25T23:00:00.000Z',
+        );
+    });
+});
 
 describe('getReservationCutoff', () => {
     it('is 18:00 Prague time on the previous calendar day', () => {
@@ -258,14 +274,14 @@ describe('checkStatusTransition', () => {
             });
         });
 
-        it('rejects customer cancellation at and after the cutoff', () => {
+        it('retains production for a customer cancellation at or after the cutoff', () => {
             expect(transition('cancelled', 'customer', wednesdayCutoff)).toEqual({
-                ok: false,
-                reason: 'CUTOFF_PASSED',
+                ok: true,
+                retainForProduction: true,
             });
             expect(transition('cancelled', 'customer', new Date('2026-11-25T09:00:00Z'))).toEqual({
-                ok: false,
-                reason: 'CUTOFF_PASSED',
+                ok: true,
+                retainForProduction: true,
             });
         });
 
@@ -292,24 +308,24 @@ describe('checkStatusTransition', () => {
         // Prague midnight ending the pickup date.
         const dayAfterPickup = new Date('2026-11-25T23:00:00Z');
 
-        it('rejects admin cancellation once the pickup date has passed', () => {
-            expect(transition('cancelled', 'admin', dayAfterPickup)).toEqual({
-                ok: false,
-                reason: 'PICKUP_DATE_PASSED',
-            });
-        });
+        it.each(['customer', 'admin'] as const)(
+            'rejects %s cancellation once the pickup date has passed',
+            (actor) => {
+                expect(transition('cancelled', actor, justBefore(dayAfterPickup))).toEqual({
+                    ok: true,
+                    retainForProduction: true,
+                });
+                expect(transition('cancelled', actor, dayAfterPickup)).toEqual({
+                    ok: false,
+                    reason: 'PICKUP_DATE_PASSED',
+                });
+            },
+        );
 
         it.each(['picked_up', 'no_show'] as const)('still allows admin %s', (to) => {
             expect(transition(to, 'admin', dayAfterPickup)).toEqual({
                 ok: true,
                 retainForProduction: false,
-            });
-        });
-
-        it('still reports the cutoff to a customer', () => {
-            expect(transition('cancelled', 'customer', dayAfterPickup)).toEqual({
-                ok: false,
-                reason: 'CUTOFF_PASSED',
             });
         });
     });

@@ -8,14 +8,14 @@ import { readProblemCode } from '@/lib/http/problem-code';
 import { describeCancelFailure, type CancelFailureKind } from '@/lib/reservations/cancellation';
 
 const FAILURE_MESSAGES: Record<CancelFailureKind, string> = {
-    CUTOFF_PASSED: 'Rezervaci se nepodařilo zrušit: termín pro online zrušení už uplynul. Pokud nemůžete přijít, zavolejte prosím do pekárny.',
+    PICKUP_DATE_PASSED: 'Rezervaci se nepodařilo zrušit: den vyzvednutí už skončil.',
     NOT_CANCELLABLE: 'Rezervaci se nepodařilo zrušit: její stav se mezitím změnil.',
     NOT_FOUND: 'Rezervaci se nepodařilo najít.',
     RETRY: 'Rezervaci se nepodařilo zrušit. Zkuste to prosím znovu.',
 };
 
-// The server decides at the cutoff itself; the margin absorbs small client clock offsets.
-const CUTOFF_REFRESH_MARGIN_MS = 1000;
+// The server decides at each boundary itself; the margin absorbs small client clock offsets.
+const BOUNDARY_REFRESH_MARGIN_MS = 1000;
 
 /**
  * The cancellation card. Rendered for every status so it stays mounted when `router.refresh()`
@@ -26,12 +26,14 @@ export const ReservationCancellation = ({
     token,
     canCancel,
     cancellationCutoff,
+    cancellationDeadline,
     children,
 }: {
     token: string;
     canCancel: boolean;
-    /** ISO instant; the page refreshes when it passes, so stale buttons disappear. */
+    /** ISO instants; the page refreshes when each passes, so the text and button stay current. */
     cancellationCutoff: string;
+    cancellationDeadline: string;
     /** The server's description of the current state. */
     children: React.ReactNode;
 }) => {
@@ -44,10 +46,15 @@ export const ReservationCancellation = ({
         if (!canCancel) {
             return;
         }
-        const delay = new Date(cancellationCutoff).getTime() - Date.now();
-        const timer = setTimeout(() => router.refresh(), delay + CUTOFF_REFRESH_MARGIN_MS);
+        const now = Date.now();
+        const cutoff = new Date(cancellationCutoff).getTime();
+        const nextBoundary = now < cutoff ? cutoff : new Date(cancellationDeadline).getTime();
+        const timer = setTimeout(
+            () => router.refresh(),
+            nextBoundary - now + BOUNDARY_REFRESH_MARGIN_MS,
+        );
         return () => clearTimeout(timer);
-    }, [canCancel, cancellationCutoff, router]);
+    }, [canCancel, cancellationCutoff, cancellationDeadline, router]);
 
     const cancel = () => {
         setFailure(null);

@@ -26,5 +26,6 @@ export const toReservationDetailsBody = (details: ReservationDetails) => ({
     totalPrice: details.totalPrice,
     items: details.items,
     cancellationCutoff: details.cancellationCutoff.toISOString(),
+    cancellationDeadline: details.cancellationDeadline.toISOString(),
     canCancel: details.canCancel,
 });

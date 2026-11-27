@@ -86,7 +86,7 @@ The following rules must never be violated:
 4. Every reservation, online or phone, must respect the previous-day 18:00 cutoff in `Europe/Prague`.
 5. Administrators may cancel after the cutoff and edit today's daily plan, but never bypass capacity constraints.
 6. Early cancellations release capacity.
-7. Late administrative cancellations retain production commitments.
+7. Late cancellations, by customers or administrators, retain production commitments.
 8. Reservation creation must be idempotent.
 9. Product prices must be read from the database.
 10. Historical reservation item snapshots must remain unchanged.

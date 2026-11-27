@@ -24,6 +24,10 @@ export const getReservationCutoff = (pickupDate: CalendarDate): Date =>
 export const isBeforeReservationCutoff = (pickupDate: CalendarDate, now: Date): boolean =>
     now.getTime() < getReservationCutoff(pickupDate).getTime();
 
+/** Midnight Prague time after the pickup date: cancellation closes when the pickup day ends. */
+export const getCancellationDeadline = (pickupDate: CalendarDate): Date =>
+    pragueTimeToInstant(addDays(pickupDate, 1), 0);
+
 type DateWindow = { firstDate: CalendarDate; lastDate: CalendarDate };
 
 /**
@@ -134,21 +138,17 @@ export const checkProductOffered = (
 };
 
 export type StatusTransitionRejectionReason =
-    | 'INVALID_TRANSITION'
-    | 'FORBIDDEN'
-    | 'CUTOFF_PASSED'
-    | 'BEFORE_PICKUP_DATE'
-    | 'PICKUP_DATE_PASSED';
+    'INVALID_TRANSITION' | 'FORBIDDEN' | 'BEFORE_PICKUP_DATE' | 'PICKUP_DATE_PASSED';
 
 export type StatusTransitionResult =
     { ok: true; retainForProduction: boolean } | Rejection<StatusTransitionRejectionReason>;
 
 /**
- * Only `confirmed` reservations can change status. Customers may only cancel, strictly before
- * the cutoff. Admin cancellation at or after the cutoff retains the production commitment.
- * Pickup outcomes are admin-only and allowed from the pickup date onwards, so a no-show can
- * be recorded the next morning. An admin cannot cancel once the pickup date has passed: it
- * would be late anyway and change nothing for production.
+ * Only `confirmed` reservations can change status. Customers and admins may cancel until the
+ * pickup date ends; a cancellation at or after the cutoff retains the production commitment,
+ * because production is planned at the cutoff. Customers may only cancel. Pickup outcomes are
+ * admin-only and allowed from the pickup date onwards, so a no-show can be recorded the next
+ * morning.
  */
 export const checkStatusTransition = (input: {
     from: ReservationStatus;
@@ -163,14 +163,10 @@ export const checkStatusTransition = (input: {
     }
     const today = getPragueDate(now);
     if (to === 'cancelled') {
-        if (actor === 'admin' && pickupDate < today) {
+        if (pickupDate < today) {
             return { ok: false, reason: 'PICKUP_DATE_PASSED' };
         }
-        const isLate = !isBeforeReservationCutoff(pickupDate, now);
-        if (actor === 'customer' && isLate) {
-            return { ok: false, reason: 'CUTOFF_PASSED' };
-        }
-        return { ok: true, retainForProduction: isLate };
+        return { ok: true, retainForProduction: !isBeforeReservationCutoff(pickupDate, now) };
     }
     if (actor !== 'admin') {
         return { ok: false, reason: 'FORBIDDEN' };
