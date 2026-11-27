@@ -213,7 +213,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Run production smoke tests for customer booking and admin login.
 - [x] Review responsive UI, accessibility basics, and error handling.
 - [x] Write README: setup, architecture, tests, deployment, assumptions, and tradeoffs.
-- [ ] Prepare public URL, admin URL, and demo credentials.
+- [x] Prepare public URL, admin URL, and demo credentials.
 - [x] Record known limitations and P1 follow-ups.
 
 ### Acceptance criteria
