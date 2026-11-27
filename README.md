@@ -23,6 +23,8 @@ pnpm dev                   # http://localhost:3000
 
 Set `MANAGEMENT_TOKEN_SECRET` in `.env` (min. 32 characters, e.g. `openssl rand -base64 32`) before creating reservations or running integration tests: reservation management tokens are derived from it.
 
+Integration tests (`pnpm test:integration`, with `pnpm db:up` running) never touch the development database. Each run drops and recreates a separate test database and applies the migrations to it: by default the `DATABASE_URL` database with a `_test` suffix (`bakeryos_test`) on the same server, or `TEST_DATABASE_URL` when set. They assume local Docker PostgreSQL: with a Neon `DATABASE_URL` in `.env`, the test database would be created on Neon. Its name must end in `_test`, otherwise the run is refused. Tests create the data they need and need no seed.
+
 Set `AUTH_SECRET` in `.env` (e.g. `openssl rand -base64 32`) before signing in: Auth.js encrypts the admin session cookie with it. The admin signs in at `/admin/login` with `ADMIN_SEED_EMAIL` and `ADMIN_SEED_PASSWORD`. Sessions last 8 hours and are not checked against the database, so resetting the password through the seed does not end existing sessions; rotating `AUTH_SECRET` does.
 
 The seed is safe to re-run: it upserts the opening days and administrator (resetting the admin password from `ADMIN_SEED_PASSWORD`, min. 12 characters), adds missing closures, and inserts the demo catalog only when the `products` table is empty.
@@ -64,7 +66,7 @@ Management links (`/reservations/manage/:token`) are built from `APP_URL` when i
 | `dev`, `build`, `start`                       | Next.js                                                            |
 | `lint`, `typecheck`, `format`, `format:check` | Code quality                                                       |
 | `test`                                        | Unit tests (`tests/unit`)                                          |
-| `test:integration`                            | Integration tests against real PostgreSQL (`tests/integration`)    |
+| `test:integration`                            | Integration tests against an isolated PostgreSQL database          |
 | `db:up`, `db:down`                            | Start/stop local PostgreSQL                                        |
 | `db:generate`                                 | Generate a migration from `src/server/db/schema.ts`                |
 | `db:migrate`                                  | Apply migrations to the database in `.env`                         |
