@@ -70,7 +70,7 @@ Argon2id hashing and verification must work inside a **deployed Netlify Function
 - Atomic multi-product reservations, availability and idempotency.
 - Admin login/logout, product CRUD/deactivation, reservation overview, manual phone reservations, status updates, daily production, and capacity overrides.
 - Late-cancellation production retention.
-- Mobile-friendly English UI.
+- Mobile-friendly Czech UI; API error messages in English.
 
 ### Deferred
 
