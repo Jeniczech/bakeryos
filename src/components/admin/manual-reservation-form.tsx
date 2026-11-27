@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { unstable_isUnrecognizedActionError as isUnrecognizedActionError } from 'next/navigation';
 import { useRef, useState, useTransition } from 'react';
 import {
     createManualReservation,
@@ -11,6 +10,12 @@ import {
 import { ADMIN_PICKUP_DATE_MESSAGES } from '@/components/admin/pickup-date-messages';
 import { PRIMARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
+import {
+    isOutdatedDeploymentError,
+    OUTDATED_DEPLOYMENT_MESSAGE,
+    RELOAD_PAGE_LABEL,
+    reloadPage,
+} from '@/components/ui/outdated-deployment';
 import type { CalendarDate } from '@/lib/date-time/prague';
 import { formatLongDate } from '@/lib/formatting/dates';
 import { formatPrice } from '@/lib/formatting/money';
@@ -61,7 +66,7 @@ const describeFailure = (failure: Failure, productNames: ReadonlyMap<string, str
         case 'NO_RESPONSE':
             return 'Nepodařilo se ověřit, zda byla rezervace uložena. Odešlete ji znovu beze změn (duplicita tak nevznikne), nebo nejdřív zkontrolujte seznam rezervací.';
         case 'OUTDATED_PAGE':
-            return 'Aplikace byla mezitím aktualizována a rezervace nebyla uložena. Obnovte stránku a vytvořte ji znovu.';
+            return OUTDATED_DEPLOYMENT_MESSAGE;
         case 'UNAVAILABLE':
             return 'Rezervaci se nepodařilo uložit. Zkuste to prosím znovu.';
         default:
@@ -169,9 +174,8 @@ export const ManualReservationForm = ({
             try {
                 result = await createManualReservation(input);
             } catch (error) {
-                // A new deployment no longer knows this page's action, so nothing was saved and
-                // only a reload can submit again.
-                if (isUnrecognizedActionError(error)) {
+                // Nothing was saved, and only a reload can submit again.
+                if (isOutdatedDeploymentError(error)) {
                     setFailure({ ok: false, error: 'OUTDATED_PAGE' });
                     return;
                 }
@@ -224,6 +228,18 @@ export const ManualReservationForm = ({
                             >
                                 Zobrazit rezervace
                             </Link>
+                        </>
+                    )}
+                    {failure.error === 'OUTDATED_PAGE' && (
+                        <>
+                            {' '}
+                            <button
+                                type="button"
+                                onClick={reloadPage}
+                                className="font-medium underline"
+                            >
+                                {RELOAD_PAGE_LABEL}
+                            </button>
                         </>
                     )}
                 </Notice>
