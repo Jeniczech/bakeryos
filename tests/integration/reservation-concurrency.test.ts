@@ -95,11 +95,17 @@ const waitUntilBlocked = async (holderPid: number, expected: number): Promise<vo
 /**
  * Locks the plans in a transaction on the observer pool and keeps them locked until
  * `release()`, so competing writers can be queued behind it in a known order.
+ *
+ * With `planExists: false` the holder creates the plans itself and keeps them uncommitted,
+ * so competitors block on the first-write insert instead. They then wake together in any
+ * order, so only the outcome counts are deterministic, not which competitor wins.
  */
-const holdPlanLocks = async (productIds: string[]) => {
-    // Committed first: waiters on an uncommitted insert would wake together in any order,
-    // while `FOR UPDATE` waiters queue for the row lock in arrival order.
-    await getDb().transaction((tx) => materializeDailyPlans(tx, PICKUP_DATE, productIds));
+const holdPlanLocks = async (productIds: string[], { planExists = true } = {}) => {
+    if (planExists) {
+        // Committed first: waiters on an uncommitted insert would wake together in any order,
+        // while `FOR UPDATE` waiters queue for the row lock in arrival order.
+        await getDb().transaction((tx) => materializeDailyPlans(tx, PICKUP_DATE, productIds));
+    }
     let release = () => {};
     const released = new Promise<void>((resolve) => (release = resolve));
     let signalLocked: (pid: number) => void = () => {};
@@ -209,12 +215,57 @@ describe('concurrent reservations', () => {
             status: 'rejected',
             reason: expect.any(InsufficientCapacityError),
         });
+        if (outcomes[0].status !== 'fulfilled' || outcomes[1].status !== 'rejected') {
+            return;
+        }
+        expect((outcomes[1].reason as InsufficientCapacityError).shortages).toEqual([
+            { productId: bread.id, requested: 1, available: 0 },
+        ]);
+
         expect((await readCommitted([bread.id])).get(bread.id)).toBe(5);
+        expect((await readPlan(bread.id)).capacity).toBe(5);
         const stored = await getDb()
-            .select({ id: reservationItems.id })
+            .select({ reservationId: reservationItems.reservationId })
             .from(reservationItems)
             .where(eq(reservationItems.productId, bread.id));
         expect(stored).toHaveLength(2);
+        expect(stored.map((row) => row.reservationId)).toContain(outcomes[0].value.reservationId);
+    });
+
+    it('lets exactly one of two requests claim the final unit while the plan is first created', async () => {
+        const bread = await insertProduct(1);
+
+        const holder = await holdPlanLocks([bread.id], { planExists: false });
+        const pending: Promise<CreateReservationResult>[] = [];
+        try {
+            for (const position of [1, 2]) {
+                const reservation = () => reserve([{ productId: bread.id, quantity: 1 }]);
+                pending.push((await holder.queue(reservation, position)).result);
+            }
+        } finally {
+            await holder.release();
+        }
+
+        const outcomes = await Promise.allSettled(pending);
+        const fulfilled = outcomes.filter((outcome) => outcome.status === 'fulfilled');
+        const rejected = outcomes.flatMap((outcome) =>
+            outcome.status === 'rejected' ? [outcome.reason] : [],
+        );
+        expect(fulfilled).toHaveLength(1);
+        expect(rejected).toHaveLength(1);
+        expect(rejected[0]).toBeInstanceOf(InsufficientCapacityError);
+
+        const plans = await getDb()
+            .select()
+            .from(dailyProductPlans)
+            .where(eq(dailyProductPlans.productId, bread.id));
+        expect(plans).toMatchObject([{ date: PICKUP_DATE, capacity: 1 }]);
+        expect((await readCommitted([bread.id])).get(bread.id)).toBe(1);
+        const stored = await getDb()
+            .select({ reservationId: reservationItems.reservationId })
+            .from(reservationItems)
+            .where(eq(reservationItems.productId, bread.id));
+        expect(stored).toHaveLength(1);
     });
 
     it('keeps overlapping multi-product carts consistent and all-or-nothing', async () => {
