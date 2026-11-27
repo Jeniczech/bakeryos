@@ -33,13 +33,8 @@ const TEST_IP_PREFIX = 'test-client-';
 let pickupDate = '';
 const createdProductIds: string[] = [];
 
-/** The first open, non-closed day from today+2 on, which is always before its cutoff. */
+/** The first non-closed day from today+2 on, which is always before its cutoff. */
 const findBookableDate = async (): Promise<string> => {
-    const openDays = await getDb()
-        .select({ weekday: bakeryOpeningDays.weekday })
-        .from(bakeryOpeningDays)
-        .where(eq(bakeryOpeningDays.isOpen, true));
-    const openWeekdays = new Set(openDays.map((day) => day.weekday));
     const closures = new Set(
         (await getDb().select({ date: bakeryClosures.date }).from(bakeryClosures)).map(
             (closure) => closure.date,
@@ -48,11 +43,11 @@ const findBookableDate = async (): Promise<string> => {
     const today = getPragueDate(new Date());
     for (let offset = 2; offset <= 7; offset++) {
         const date = addDays(today, offset);
-        if (openWeekdays.has(getWeekday(date)) && !closures.has(date)) {
+        if (!closures.has(date)) {
             return date;
         }
     }
-    throw new Error('No open day in the online booking window; seed the schedule first.');
+    throw new Error('Every day in the online booking window is closed.');
 };
 
 const insertProduct = async (defaultCapacity = 5, name = 'API test loaf') => {
@@ -102,6 +97,10 @@ const cancelManaged = (token: string) =>
 
 beforeAll(async () => {
     pickupDate = await findBookableDate();
+    await getDb()
+        .insert(bakeryOpeningDays)
+        .values({ weekday: getWeekday(pickupDate), isOpen: true })
+        .onConflictDoNothing();
 });
 
 afterEach(async () => {
