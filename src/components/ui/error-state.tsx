@@ -17,6 +17,7 @@ export const ErrorState = ({
     headingLevel: Heading,
     message,
     homeHref = '/',
+    retryLabel = 'Zkusit znovu',
 }: {
     error: unknown;
     retry: () => void;
@@ -25,6 +26,7 @@ export const ErrorState = ({
     headingLevel: 'h1' | 'h2';
     message: string;
     homeHref?: string;
+    retryLabel?: string;
 }) => {
     const headingId = useId();
     useEffect(() => {
@@ -41,7 +43,7 @@ export const ErrorState = ({
             <Notice tone="warning">{message}</Notice>
             <div className="flex flex-wrap gap-3">
                 <button type="button" onClick={retry} className={SECONDARY_BUTTON_CLASSES}>
-                    Zkusit znovu
+                    {retryLabel}
                 </button>
                 <Link href={homeHref} className={SECONDARY_BUTTON_CLASSES}>
                     Zpět na úvod
