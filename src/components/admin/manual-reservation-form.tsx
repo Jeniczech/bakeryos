@@ -10,6 +10,12 @@ import {
 import { ADMIN_PICKUP_DATE_MESSAGES } from '@/components/admin/pickup-date-messages';
 import { PRIMARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
+import {
+    isOutdatedDeploymentError,
+    OUTDATED_DEPLOYMENT_MESSAGE,
+    RELOAD_PAGE_LABEL,
+    reloadPage,
+} from '@/components/ui/outdated-deployment';
 import type { CalendarDate } from '@/lib/date-time/prague';
 import { formatLongDate } from '@/lib/formatting/dates';
 import { formatPrice } from '@/lib/formatting/money';
@@ -21,7 +27,8 @@ type Success = Extract<ManualReservationResult, { ok: true }>;
 type Failure =
     | Extract<ManualReservationResult, { ok: false }>
     | { ok: false; error: 'INVALID_QUANTITY'; productIds: string[] }
-    | { ok: false; error: 'NO_RESPONSE' };
+    | { ok: false; error: 'NO_RESPONSE' }
+    | { ok: false; error: 'OUTDATED_PAGE' };
 
 /** A product the form has shown; `offered` is false once a refresh no longer lists it. */
 type ProductRow = AvailableProduct & { offered: boolean };
@@ -58,6 +65,8 @@ const describeFailure = (failure: Failure, productNames: ReadonlyMap<string, str
             return 'Tato rezervace už mohla být uložena dříve. Než ji vytvoříte znovu, zkontrolujte seznam rezervací, ať nevznikne duplicita.';
         case 'NO_RESPONSE':
             return 'Nepodařilo se ověřit, zda byla rezervace uložena. Odešlete ji znovu beze změn (duplicita tak nevznikne), nebo nejdřív zkontrolujte seznam rezervací.';
+        case 'OUTDATED_PAGE':
+            return OUTDATED_DEPLOYMENT_MESSAGE;
         case 'UNAVAILABLE':
             return 'Rezervaci se nepodařilo uložit. Zkuste to prosím znovu.';
         default:
@@ -164,7 +173,12 @@ export const ManualReservationForm = ({
             let result: ManualReservationResult;
             try {
                 result = await createManualReservation(input);
-            } catch {
+            } catch (error) {
+                // Nothing was saved, and only a reload can submit again.
+                if (isOutdatedDeploymentError(error)) {
+                    setFailure({ ok: false, error: 'OUTDATED_PAGE' });
+                    return;
+                }
                 // The request may still have succeeded: keep the key so a retry replays it.
                 setFailure({ ok: false, error: 'NO_RESPONSE' });
                 return;
@@ -214,6 +228,18 @@ export const ManualReservationForm = ({
                             >
                                 Zobrazit rezervace
                             </Link>
+                        </>
+                    )}
+                    {failure.error === 'OUTDATED_PAGE' && (
+                        <>
+                            {' '}
+                            <button
+                                type="button"
+                                onClick={reloadPage}
+                                className="font-medium underline"
+                            >
+                                {RELOAD_PAGE_LABEL}
+                            </button>
                         </>
                     )}
                 </Notice>
