@@ -1,6 +1,6 @@
 'use client';
 
-import { ErrorState } from '@/components/storefront/error-state';
+import { ErrorState } from '@/components/ui/error-state';
 
 /**
  * Below the order layout, so the date picker and the in-memory cart and contact details stay

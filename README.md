@@ -4,6 +4,56 @@ Bakery reservations and daily production planning. Next.js (App Router), Postgre
 
 See `docs/PRD.md` (product), `docs/TDD.md` (technical design), and `docs/IMPLEMENTATION_PLAN.md` (delivery stages).
 
+## Demo
+
+| What        | Where                                        |
+| ----------- | -------------------------------------------- |
+| Storefront  | https://bakeryos-311.netlify.app             |
+| Admin login | https://bakeryos-311.netlify.app/admin/login |
+| Health      | https://bakeryos-311.netlify.app/api/health  |
+
+Admin credentials are shared with reviewers separately rather than committed, because the repository is public.
+
+The UI is in Czech; API error messages are in English. Pickup dates run from tomorrow to today + 7. Bookings for a date close at 18:00 Prague time the day before, so the first bookable date moves forward after 18:00.
+
+Suggested walkthrough:
+
+1. On the storefront, pick a date, add several products, enter a name and phone number, and submit. Open the management link from the confirmation and cancel.
+2. In the admin, open **Rezervace** to see the reservation, create a phone reservation, and cancel or mark one picked up.
+3. Open **Výroba** to see the recommended quantity to bake per product, and override a capacity: it can never go below walk-ins plus already committed units.
+4. Open **Produkty** to change a price: existing reservations keep the price they were made at.
+
+## Architecture
+
+A single Next.js application, with no separate backend:
+
+- **Route Handlers** (`src/app/api`) serve the public reservation API, which the storefront also uses.
+- **Server Components** read data for pages. **Server Actions** run admin mutations and check the session themselves, not only through the layout.
+- **Application services** (`src/server/services`) hold the workflows: create and cancel reservations, change status, update daily plans, manage products. They know nothing about HTTP, so the public API and the admin share them; a phone reservation runs the same `createReservation` as an online one, only with `source = 'admin'`.
+- **Domain functions** (`src/server/domain`) are pure: availability, production recommendation, cutoff and transition rules. Prague dates and the cutoff live in `src/lib/date-time/prague.ts`.
+- **Zod** validates every external input. Services throw typed domain errors, which become RFC 9457 Problem Details in the API and Czech messages in the UI.
+
+### Key decisions
+
+- **Capacity is protected by PostgreSQL row locks, not by checks in application memory.** Every write that affects a product's capacity for a date runs in one transaction. It first creates any missing `daily_product_plans` rows (`INSERT … ON CONFLICT DO NOTHING`), then locks them with `SELECT … FOR UPDATE` in ascending product-ID order so two transactions cannot deadlock. Only after it holds the locks does it re-read committed quantities, eligibility and the clock (waiting for a lock can cross the cutoff), and validate the whole cart. A cart either succeeds completely or nothing is written.
+- **Daily plans snapshot product defaults** on their first write, so later changes to a product's default capacity never rewrite a date that already has reservations.
+- **Reservation creation is idempotent.** The client sends a UUID key and the server stores a hash of the normalized request. A retry with the same request returns the original confirmation; the same key with a different request is a `409`. A unique constraint is the final guard against concurrent duplicates.
+- **Late cancellations stay in production.** Production is planned at the 18:00 cutoff, so an admin cancellation after it keeps `retain_for_production = true` and its units still count as committed. Customers can cancel only before the cutoff, which releases the units.
+- **Phone reservations follow the same cutoff** as online ones, for the same reason: units reserved after the plan is made might never be baked. Only the online quantity limits (20 per product, 50 per reservation) do not apply.
+- **Prices come from the database** and are stored as integer haléře, with name and price snapshots on each reservation item.
+- **A custom admin instead of a CMS:** the admin is a few screens tied closely to the capacity rules, and a CMS such as Payload would add a second data model and its own write path.
+- **Management links are bearer tokens** derived with HMAC from `MANAGEMENT_TOKEN_SECRET`, so customers need no account. The database stores only a SHA-256 hash of each token, and a retried request can return the same link because the token is derived again rather than stored.
+
+## Testing
+
+| Command                 | Covers                                                                                                                                                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm test`             | Unit tests: availability and production formulas, cutoff and booking window around 18:00 and DST changes, status transitions, validation, HTTP mapping                                                                          |
+| `pnpm test:integration` | Services and API against real PostgreSQL: concurrent last-unit bookings (checks the final database state), idempotent replay and races, early vs. late cancellation, daily plan overrides, snapshots, admin auth, rate limiting |
+| `pnpm test:e2e`         | Playwright: book, open the management link, cancel                                                                                                                                                                              |
+
+Integration and E2E tests need local PostgreSQL (`pnpm db:up`); details are under [Local setup](#local-setup).
+
 ## Requirements
 
 - Node.js 24
@@ -95,3 +145,23 @@ Migrations are applied explicitly, never automatically during builds.
 3. Push the code to `main`.
 
 Keep migrations backward compatible so the currently deployed version keeps working until the new deploy is live.
+
+## Assumptions and tradeoffs
+
+- One bakery, one administrator account, one timezone (`Europe/Prague`).
+- Opening days, closures and product weekdays are seeded. They have no admin screens yet (P1).
+- Reservations cannot be edited: cancel and create a new one. Statuses `picked_up`, `no_show` and `cancelled` are final.
+- Availability shown in the catalog is informational. The server checks it again when the reservation is submitted.
+- Rate limiting is stored in PostgreSQL rather than a separate service such as Redis. That is enough for one instance of a small bakery's traffic.
+- Admin sessions are stateless JWTs that last 8 hours, so resetting the password does not end existing sessions.
+- Deploy Previews share the production database.
+
+## Known limitations and P1 follow-ups
+
+- Admin screens for opening days, closures and product weekdays (new products are offered on every open day).
+- A print-friendly production sheet.
+- Search and filters in the reservation list, and reporting.
+- Product image upload (products support an optional image URL only).
+- Rotation of the management-token secret: changing `MANAGEMENT_TOKEN_SECRET` today invalidates every existing management link.
+- No email or SMS confirmation. The management link is shown only on the confirmation page, so a customer who loses it has to call the bakery.
+- No E2E test for the admin: the Playwright test covers the customer flow, and integration tests cover the admin workflows.
