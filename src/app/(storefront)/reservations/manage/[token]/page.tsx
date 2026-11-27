@@ -7,7 +7,10 @@ import { ReservationCancellation } from '@/components/storefront/reservation-can
 import { ReservationItems } from '@/components/storefront/reservation-items';
 import { SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
-import { formatLongDate, formatPragueDateTimeWithPreposition } from '@/lib/formatting/dates';
+import {
+    formatLongDateWithPreposition,
+    formatPragueDateTimeWithPreposition,
+} from '@/lib/formatting/dates';
 import { ReservationNotFoundError } from '@/server/domain/errors';
 import { describeForLog } from '@/server/http/problem-details';
 import {
@@ -118,7 +121,8 @@ const ManagedReservation = async ({
                     <strong className="font-semibold text-amber-950">
                         {details.reservationNumber}
                     </strong>
-                    , {details.customerName}, vyzvednutí {formatLongDate(details.pickupDate)}.
+                    , {details.customerName}, vyzvednutí{' '}
+                    {formatLongDateWithPreposition(details.pickupDate)}.
                     {details.status === 'confirmed' && ' Zaplatíte až při vyzvednutí.'}
                 </p>
             </div>
