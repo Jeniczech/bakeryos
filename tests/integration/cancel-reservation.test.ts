@@ -22,6 +22,7 @@ const PICKUP_DATE = '2099-09-16'; // Wednesday
 const WEDNESDAY = 3;
 const BEFORE_CUTOFF = pragueTimeToInstant('2099-09-15', 12);
 const CUTOFF = pragueTimeToInstant('2099-09-15', 18);
+const JUST_BEFORE_CUTOFF = new Date(CUTOFF.getTime() - 1);
 const AFTER_CUTOFF = pragueTimeToInstant('2099-09-16', 9);
 
 const createdProductIds: string[] = [];
@@ -175,6 +176,82 @@ describe('cancelReservation', () => {
             cancelledAt: null,
         });
     });
+
+    it('lets a customer cancel one millisecond before the cutoff', async () => {
+        const product = await insertProduct();
+        const created = await reserve(product.id, 2);
+
+        await cancelReservation(
+            { actor: 'customer', token: created.managementToken },
+            { now: JUST_BEFORE_CUTOFF },
+        );
+
+        expect(await readReservation(created.reservationId)).toMatchObject({
+            status: 'cancelled',
+            retainForProduction: false,
+            cancelledAt: JUST_BEFORE_CUTOFF,
+        });
+        expect(await readCommitted(product.id)).toEqual({
+            activeReserved: 0,
+            retainedCancelled: 0,
+        });
+    });
+
+    it('treats an admin cancellation at the exact cutoff as late', async () => {
+        const product = await insertProduct();
+        const created = await reserve(product.id, 2);
+
+        await cancelReservation(
+            { actor: 'admin', reservationId: created.reservationId },
+            { now: CUTOFF },
+        );
+
+        expect(await readReservation(created.reservationId)).toMatchObject({
+            status: 'cancelled',
+            retainForProduction: true,
+            cancelledAt: CUTOFF,
+        });
+        expect(await readCommitted(product.id)).toEqual({
+            activeReserved: 0,
+            retainedCancelled: 2,
+        });
+    });
+
+    it.each([
+        ['releases', BEFORE_CUTOFF, false, { activeReserved: 0, retainedCancelled: 0 }],
+        ['retains', AFTER_CUTOFF, true, { activeReserved: 0, retainedCancelled: 2 }],
+    ] as const)(
+        '%s every product of a multi-product reservation together',
+        async (_label, now, retainForProduction, expected) => {
+            const bread = await insertProduct();
+            const roll = await insertProduct();
+            const created = await createReservation(
+                {
+                    idempotencyKey: randomUUID(),
+                    pickupDate: PICKUP_DATE,
+                    customer: { name: 'Jane Doe', phone: '+420777123456' },
+                    items: [
+                        { productId: bread.id, quantity: 2 },
+                        { productId: roll.id, quantity: 2 },
+                    ],
+                    source: 'online',
+                },
+                { now: BEFORE_CUTOFF },
+            );
+
+            await cancelReservation(
+                { actor: 'admin', reservationId: created.reservationId },
+                { now },
+            );
+
+            expect(await readReservation(created.reservationId)).toMatchObject({
+                status: 'cancelled',
+                retainForProduction,
+            });
+            expect(await readCommitted(bread.id)).toEqual(expected);
+            expect(await readCommitted(roll.id)).toEqual(expected);
+        },
+    );
 
     it('keeps the production commitment when an admin cancels after the cutoff', async () => {
         const product = await insertProduct();
