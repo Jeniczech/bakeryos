@@ -121,8 +121,9 @@ describe('first-write daily-plan snapshots', () => {
         expect(await readPlan(bread.id, UNPLANNED_DATE)).toBeUndefined();
         expect(await readRemaining(bread.id, PLANNED_DATE)).toBe(2);
         expect(await readRemaining(bread.id, UNPLANNED_DATE)).toBe(20);
-        await expect(reserve(bread.id, 3)).rejects.toBeInstanceOf(InsufficientCapacityError);
-        await expect(reserve(bread.id, 3)).rejects.toMatchObject({
+        const overbooking = reserve(bread.id, 3);
+        await expect(overbooking).rejects.toBeInstanceOf(InsufficientCapacityError);
+        await expect(overbooking).rejects.toMatchObject({
             shortages: [{ productId: bread.id, requested: 3, available: 2 }],
         });
         await expect(reserve(bread.id, 2)).resolves.toMatchObject({ status: 'confirmed' });

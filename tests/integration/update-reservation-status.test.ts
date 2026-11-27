@@ -335,49 +335,53 @@ describe('updateReservationStatus', () => {
 });
 
 describe('competing status changes', () => {
+    const pickUp = (reservationId: string) =>
+        updateReservationStatus({ reservationId, status: 'picked_up' }, { now: PICKUP_DAY });
+    const markNoShow = (reservationId: string) =>
+        updateReservationStatus({ reservationId, status: 'no_show' }, { now: PICKUP_DAY });
+    const cancelLate = (reservationId: string) =>
+        cancelReservation({ actor: 'admin', reservationId }, { now: PICKUP_DAY });
+
     it('lets the first of picked_up and no_show win and rejects the other', async () => {
         const product = await insertProduct();
         const created = await reserve([{ productId: product.id, quantity: 1 }]);
         const reservationId = created.reservationId;
+
         const holder = await holdReservationLock(reservationId);
+        let pickedUp: Promise<void> | undefined;
+        let noShow: Promise<void> | undefined;
+        try {
+            pickedUp = (await holder.queue(() => pickUp(reservationId), 1)).result;
+            noShow = (await holder.queue(() => markNoShow(reservationId), 2)).result;
+        } finally {
+            await holder.release();
+        }
 
-        const pickedUp = await holder.queue(
-            () =>
-                updateReservationStatus(
-                    { reservationId, status: 'picked_up' },
-                    { now: PICKUP_DAY },
-                ),
-            1,
-        );
-        const noShow = await holder.queue(
-            () =>
-                updateReservationStatus({ reservationId, status: 'no_show' }, { now: PICKUP_DAY }),
-            2,
-        );
-        await holder.release();
-
-        await expect(pickedUp.result).resolves.toBeUndefined();
-        await expect(noShow.result).rejects.toMatchObject({ code: 'INVALID_TRANSITION' });
+        await expect(pickedUp).resolves.toBeUndefined();
+        await expect(noShow).rejects.toMatchObject({ code: 'INVALID_TRANSITION' });
         expect(await readReservation(reservationId)).toMatchObject({
             status: 'picked_up',
             cancelledAt: null,
         });
     });
 
-    it('accepts the same outcome submitted twice at once, writing it once', async () => {
+    it('accepts the same outcome submitted twice at once', async () => {
         const product = await insertProduct();
         const created = await reserve([{ productId: product.id, quantity: 1 }]);
         const reservationId = created.reservationId;
+
         const holder = await holdReservationLock(reservationId);
+        let first: Promise<void> | undefined;
+        let second: Promise<void> | undefined;
+        try {
+            first = (await holder.queue(() => pickUp(reservationId), 1)).result;
+            second = (await holder.queue(() => pickUp(reservationId), 2)).result;
+        } finally {
+            await holder.release();
+        }
 
-        const submit = () =>
-            updateReservationStatus({ reservationId, status: 'picked_up' }, { now: PICKUP_DAY });
-        const first = await holder.queue(submit, 1);
-        const second = await holder.queue(submit, 2);
-        await holder.release();
-
-        await expect(first.result).resolves.toBeUndefined();
-        await expect(second.result).resolves.toBeUndefined();
+        await expect(first).resolves.toBeUndefined();
+        await expect(second).resolves.toBeUndefined();
         expect(await readReservation(reservationId)).toMatchObject({ status: 'picked_up' });
     });
 
@@ -385,24 +389,19 @@ describe('competing status changes', () => {
         const product = await insertProduct();
         const created = await reserve([{ productId: product.id, quantity: 2 }]);
         const reservationId = created.reservationId;
+
         const holder = await holdReservationLock(reservationId);
+        let cancel: Promise<unknown> | undefined;
+        let pickedUp: Promise<void> | undefined;
+        try {
+            cancel = (await holder.queue(() => cancelLate(reservationId), 1)).result;
+            pickedUp = (await holder.queue(() => pickUp(reservationId), 2)).result;
+        } finally {
+            await holder.release();
+        }
 
-        const cancel = await holder.queue(
-            () => cancelReservation({ actor: 'admin', reservationId }, { now: PICKUP_DAY }),
-            1,
-        );
-        const pickedUp = await holder.queue(
-            () =>
-                updateReservationStatus(
-                    { reservationId, status: 'picked_up' },
-                    { now: PICKUP_DAY },
-                ),
-            2,
-        );
-        await holder.release();
-
-        await expect(cancel.result).resolves.toMatchObject({ status: 'cancelled' });
-        await expect(pickedUp.result).rejects.toMatchObject({ code: 'INVALID_TRANSITION' });
+        await expect(cancel).resolves.toMatchObject({ status: 'cancelled' });
+        await expect(pickedUp).rejects.toMatchObject({ code: 'INVALID_TRANSITION' });
         expect(await readReservation(reservationId)).toMatchObject({
             status: 'cancelled',
             retainForProduction: true,
@@ -414,21 +413,19 @@ describe('competing status changes', () => {
         const product = await insertProduct();
         const created = await reserve([{ productId: product.id, quantity: 2 }]);
         const reservationId = created.reservationId;
+
         const holder = await holdReservationLock(reservationId);
+        let noShow: Promise<void> | undefined;
+        let cancel: Promise<unknown> | undefined;
+        try {
+            noShow = (await holder.queue(() => markNoShow(reservationId), 1)).result;
+            cancel = (await holder.queue(() => cancelLate(reservationId), 2)).result;
+        } finally {
+            await holder.release();
+        }
 
-        const noShow = await holder.queue(
-            () =>
-                updateReservationStatus({ reservationId, status: 'no_show' }, { now: PICKUP_DAY }),
-            1,
-        );
-        const cancel = await holder.queue(
-            () => cancelReservation({ actor: 'admin', reservationId }, { now: PICKUP_DAY }),
-            2,
-        );
-        await holder.release();
-
-        await expect(noShow.result).resolves.toBeUndefined();
-        await expect(cancel.result).rejects.toMatchObject({ code: 'INVALID_TRANSITION' });
+        await expect(noShow).resolves.toBeUndefined();
+        await expect(cancel).rejects.toMatchObject({ code: 'INVALID_TRANSITION' });
         expect(await readReservation(reservationId)).toMatchObject({
             status: 'no_show',
             cancelledAt: null,

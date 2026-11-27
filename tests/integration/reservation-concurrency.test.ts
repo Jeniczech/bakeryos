@@ -184,6 +184,23 @@ const readPlan = async (productId: string) => {
     return plan;
 };
 
+/** Saves the product's daily plan through the admin service, with no walk-ins. */
+const savePlan = (
+    productId: string,
+    capacity: number,
+    options: { expected?: { capacity: number; walkInQuantity: number }; now?: Date } = {},
+) =>
+    updateDailyPlan(
+        {
+            productId,
+            date: PICKUP_DATE,
+            capacity,
+            walkInQuantity: 0,
+            expected: options.expected,
+        },
+        { now: options.now ?? BEFORE_CUTOFF },
+    );
+
 beforeAll(async () => {
     await getDb()
         .insert(bakeryOpeningDays)
@@ -516,12 +533,6 @@ describe('concurrent requests with the same idempotency key', () => {
 });
 
 describe('reservation concurrent with capacity reduction', () => {
-    const reduceTo = (productId: string, capacity: number) =>
-        updateDailyPlan(
-            { productId, date: PICKUP_DATE, capacity, walkInQuantity: 0 },
-            { now: BEFORE_CUTOFF },
-        );
-
     it('rejects the reduction when the reservation commits first', async () => {
         const bread = await insertProduct(10);
 
@@ -532,7 +543,7 @@ describe('reservation concurrent with capacity reduction', () => {
             reservation = (
                 await holder.queue(() => reserve([{ productId: bread.id, quantity: 6 }]), 1)
             ).result;
-            reduction = (await holder.queue(() => reduceTo(bread.id, 5), 2)).result;
+            reduction = (await holder.queue(() => savePlan(bread.id, 5), 2)).result;
         } finally {
             await holder.release();
         }
@@ -550,7 +561,7 @@ describe('reservation concurrent with capacity reduction', () => {
         let reduction: Promise<unknown> | undefined;
         let reservation: Promise<CreateReservationResult> | undefined;
         try {
-            reduction = (await holder.queue(() => reduceTo(bread.id, 5), 1)).result;
+            reduction = (await holder.queue(() => savePlan(bread.id, 5), 1)).result;
             reservation = (
                 await holder.queue(() => reserve([{ productId: bread.id, quantity: 6 }]), 2)
             ).result;
@@ -615,22 +626,6 @@ describe('cancellation concurrent with a new reservation', () => {
 });
 
 describe('concurrent capacity edits', () => {
-    const savePlan = (
-        productId: string,
-        capacity: number,
-        options: { expected?: { capacity: number; walkInQuantity: number }; now?: Date } = {},
-    ) =>
-        updateDailyPlan(
-            {
-                productId,
-                date: PICKUP_DATE,
-                capacity,
-                walkInQuantity: 0,
-                expected: options.expected,
-            },
-            { now: options.now ?? BEFORE_CUTOFF },
-        );
-
     it('rejects the second of two saves based on the same loaded values', async () => {
         const bread = await insertProduct(10);
         const loaded = { capacity: 10, walkInQuantity: 0 };
@@ -649,6 +644,8 @@ describe('concurrent capacity edits', () => {
 
         await expect(first).resolves.toMatchObject({ capacity: 8 });
         await expect(second).rejects.toBeInstanceOf(PlanChangedError);
+        // Reports the plan the first save left, so the editor can reload it.
+        await expect(second).rejects.toMatchObject({ current: { capacity: 8, walkInQuantity: 0 } });
         expect(await readPlan(bread.id)).toMatchObject({ capacity: 8, walkInQuantity: 0 });
     });
 
@@ -681,7 +678,38 @@ describe('concurrent capacity edits', () => {
         expect((await readCommitted([bread.id])).get(bread.id)).toBe(0);
     });
 
-    it('rejects a reduction queued behind a late cancellation, whose items stay committed', async () => {
+    it('rejects a reduction that locks before an early cancellation releases capacity', async () => {
+        const bread = await insertProduct(5);
+        const existing = await reserve([{ productId: bread.id, quantity: 4 }]);
+
+        const holder = await holdPlanLocks([bread.id]);
+        let reduction: Promise<unknown> | undefined;
+        let cancellation: Promise<unknown> | undefined;
+        try {
+            reduction = (await holder.queue(() => savePlan(bread.id, 2), 1)).result;
+            cancellation = (
+                await holder.queue(
+                    () =>
+                        cancelReservation(
+                            { actor: 'admin', reservationId: existing.reservationId },
+                            { now: BEFORE_CUTOFF },
+                        ),
+                    2,
+                )
+            ).result;
+        } finally {
+            await holder.release();
+        }
+
+        await expect(reduction).rejects.toBeInstanceOf(PlanBelowCommitmentsError);
+        await expect(cancellation).resolves.toMatchObject({ status: 'cancelled' });
+        expect(await readPlan(bread.id)).toMatchObject({ capacity: 5 });
+        expect((await readCommitted([bread.id])).get(bread.id)).toBe(0);
+    });
+
+    // Unlike the early case, the outcome does not depend on lock order: retained items count
+    // either way. This checks the reduction reads the retention committed while it waited.
+    it('rejects a reduction waiting on a late cancellation, whose items stay committed', async () => {
         const bread = await insertProduct(5);
         const existing = await reserve([{ productId: bread.id, quantity: 4 }]);
 

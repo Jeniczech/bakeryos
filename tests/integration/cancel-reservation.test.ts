@@ -13,7 +13,10 @@ import {
 } from '@/server/db/schema';
 import { ReservationNotFoundError, StatusTransitionError } from '@/server/domain/errors';
 import { cancelReservation } from '@/server/services/reservations/cancel-reservation';
-import { createReservation } from '@/server/services/reservations/create-reservation';
+import {
+    createReservation,
+    type CreateReservationInput,
+} from '@/server/services/reservations/create-reservation';
 import { getReservationByToken } from '@/server/services/reservations/get-reservation';
 import { deriveManagementToken } from '@/server/services/reservations/management-token';
 
@@ -36,17 +39,19 @@ const insertProduct = async (defaultCapacity = 5) => {
     return product;
 };
 
-const reserve = (productId: string, quantity: number) =>
+const reserveItems = (items: CreateReservationInput['items']) =>
     createReservation(
         {
             idempotencyKey: randomUUID(),
             pickupDate: PICKUP_DATE,
             customer: { name: 'Jane Doe', phone: '+420777123456' },
-            items: [{ productId, quantity }],
+            items,
             source: 'online',
         },
         { now: BEFORE_CUTOFF },
     );
+
+const reserve = (productId: string, quantity: number) => reserveItems([{ productId, quantity }]);
 
 const readReservation = async (reservationId: string) => {
     const [row] = await getDb()
@@ -197,6 +202,26 @@ describe('cancelReservation', () => {
         });
     });
 
+    it('releases the capacity when an admin cancels one millisecond before the cutoff', async () => {
+        const product = await insertProduct();
+        const created = await reserve(product.id, 2);
+
+        await cancelReservation(
+            { actor: 'admin', reservationId: created.reservationId },
+            { now: JUST_BEFORE_CUTOFF },
+        );
+
+        expect(await readReservation(created.reservationId)).toMatchObject({
+            status: 'cancelled',
+            retainForProduction: false,
+            cancelledAt: JUST_BEFORE_CUTOFF,
+        });
+        expect(await readCommitted(product.id)).toEqual({
+            activeReserved: 0,
+            retainedCancelled: 0,
+        });
+    });
+
     it('treats an admin cancellation at the exact cutoff as late', async () => {
         const product = await insertProduct();
         const created = await reserve(product.id, 2);
@@ -225,19 +250,10 @@ describe('cancelReservation', () => {
         async (_label, now, retainForProduction, expected) => {
             const bread = await insertProduct();
             const roll = await insertProduct();
-            const created = await createReservation(
-                {
-                    idempotencyKey: randomUUID(),
-                    pickupDate: PICKUP_DATE,
-                    customer: { name: 'Jane Doe', phone: '+420777123456' },
-                    items: [
-                        { productId: bread.id, quantity: 2 },
-                        { productId: roll.id, quantity: 2 },
-                    ],
-                    source: 'online',
-                },
-                { now: BEFORE_CUTOFF },
-            );
+            const created = await reserveItems([
+                { productId: bread.id, quantity: 2 },
+                { productId: roll.id, quantity: 2 },
+            ]);
 
             await cancelReservation(
                 { actor: 'admin', reservationId: created.reservationId },
