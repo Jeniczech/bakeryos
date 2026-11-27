@@ -34,21 +34,23 @@ const toUtcMidnight = (date: CalendarDate): Date => new Date(`${date}T00:00:00Z`
 export const formatLongDate = (date: CalendarDate): string =>
     longDateFormatter.format(toUtcMidnight(date));
 
-// Feminine weekdays change after "na"; the masculine ones keep their nominative form.
+// Feminine weekdays change after "na" or "v"; the masculine ones keep their nominative form.
 const ACCUSATIVE_WEEKDAYS: Readonly<Record<string, string>> = {
     středa: 'středu',
     sobota: 'sobotu',
     neděle: 'neděli',
 };
 
-/** The long date after the preposition "na", e.g. "středu 25. listopadu". */
-export const formatLongDateAccusative = (date: CalendarDate): string =>
-    longDateFormatter
-        .formatToParts(toUtcMidnight(date))
+const joinAccusative = (parts: Intl.DateTimeFormatPart[]): string =>
+    parts
         .map((part) =>
             part.type === 'weekday' ? (ACCUSATIVE_WEEKDAYS[part.value] ?? part.value) : part.value,
         )
         .join('');
+
+/** The long date after the preposition "na", e.g. "středu 25. listopadu". */
+export const formatLongDateAccusative = (date: CalendarDate): string =>
+    joinAccusative(longDateFormatter.formatToParts(toUtcMidnight(date)));
 
 /** e.g. `{ weekday: 'st', dayMonth: '25. 11.' }`, for compact date pickers. */
 export const formatShortDate = (date: CalendarDate): { weekday: string; dayMonth: string } => ({
@@ -62,3 +64,13 @@ export const formatShortDate = (date: CalendarDate): { weekday: string; dayMonth
  */
 export const formatPragueDateTime = (instant: Date): string =>
     `${pragueDateFormatter.format(instant)} v ${pragueTimeFormatter.format(instant)}`;
+
+/**
+ * An instant as Prague wall-clock time with its preposition, e.g. "v sobotu 28. listopadu
+ * v 18:00" or "ve středu 25. listopadu v 18:00".
+ */
+export const formatPragueDateTimeWithPreposition = (instant: Date): string => {
+    const date = joinAccusative(pragueDateFormatter.formatToParts(instant));
+    const preposition = /^(středu|čtvrtek)/.test(date) ? 've' : 'v';
+    return `${preposition} ${date} v ${pragueTimeFormatter.format(instant)}`;
+};

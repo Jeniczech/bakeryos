@@ -3,6 +3,7 @@ import {
     formatLongDate,
     formatLongDateAccusative,
     formatPragueDateTime,
+    formatPragueDateTimeWithPreposition,
     formatShortDate,
 } from '@/lib/formatting/dates';
 
@@ -37,5 +38,20 @@ describe('formatPragueDateTime', () => {
         expect(formatPragueDateTime(new Date('2026-07-14T16:00:00Z'))).toBe(
             'úterý 14. července v 18:00',
         );
+    });
+});
+
+describe('formatPragueDateTimeWithPreposition', () => {
+    it.each([
+        ['2026-11-23T17:00:00Z', 'v pondělí 23. listopadu v 18:00'],
+        ['2026-11-24T17:00:00Z', 'v úterý 24. listopadu v 18:00'],
+        ['2026-11-25T17:00:00Z', 've středu 25. listopadu v 18:00'],
+        ['2026-11-26T17:00:00Z', 've čtvrtek 26. listopadu v 18:00'],
+        ['2026-11-27T17:00:00Z', 'v pátek 27. listopadu v 18:00'],
+        ['2026-11-28T17:00:00Z', 'v sobotu 28. listopadu v 18:00'],
+        ['2026-11-29T17:00:00Z', 'v neděli 29. listopadu v 18:00'],
+        ['2026-07-14T16:00:00Z', 'v úterý 14. července v 18:00'],
+    ])('formats %s as "%s"', (instant, expected) => {
+        expect(formatPragueDateTimeWithPreposition(new Date(instant))).toBe(expected);
     });
 });

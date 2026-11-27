@@ -36,7 +36,7 @@ export const ReservationCancellation = ({
      * server keeps a wrong client clock from refreshing too early or too late.
      */
     refreshInMs: number | null;
-    /** The server's description of the current state. */
+    /** The server's description of the current state, as paragraphs. */
     children: React.ReactNode;
 }) => {
     const router = useRouter();
@@ -86,7 +86,7 @@ export const ReservationCancellation = ({
                 Zrušení
             </h2>
             {visibleFailure && <Notice tone="warning">{FAILURE_MESSAGES[visibleFailure]}</Notice>}
-            <p className="text-sm text-stone-600">{children}</p>
+            <div className="flex flex-col gap-2 text-sm text-stone-600">{children}</div>
             {canCancel &&
                 (confirming ? (
                     <div className="flex flex-col gap-3">
