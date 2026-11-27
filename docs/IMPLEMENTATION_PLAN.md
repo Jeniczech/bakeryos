@@ -187,7 +187,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Complete isolated PostgreSQL integration tests.
 - [x] Test competing reservations for the last unit using independent DB connections and controlled overlap.
 - [x] Test overlapping multi-product requests.
-- [ ] Test same/different payload idempotency replay.
+- [x] Test same/different payload idempotency replay.
 - [ ] Test early/late cancellation and admin cutoff enforcement.
 - [ ] Test concurrent capacity edits and status changes.
 - [ ] Test first-write daily-plan snapshots.
