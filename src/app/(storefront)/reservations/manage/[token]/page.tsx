@@ -7,7 +7,7 @@ import { ReservationCancellation } from '@/components/storefront/reservation-can
 import { ReservationItems } from '@/components/storefront/reservation-items';
 import { SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
-import { formatLongDate, formatPragueDateTime } from '@/lib/formatting/dates';
+import { formatLongDate, formatPragueDateTimeWithPreposition } from '@/lib/formatting/dates';
 import { ReservationNotFoundError } from '@/server/domain/errors';
 import { describeForLog } from '@/server/http/problem-details';
 import {
@@ -26,34 +26,41 @@ export const metadata: Metadata = {
 const describeReservation = (
     details: ReservationDetails,
     now: Date,
-): { heading: string; cancellationNote: string } => {
-    const cutoff = formatPragueDateTime(details.cancellationCutoff);
+): { heading: string; cancellationNote: string[] } => {
+    const cutoff = formatPragueDateTimeWithPreposition(details.cancellationCutoff);
     switch (details.status) {
         case 'confirmed':
             return {
                 heading: 'Vaše rezervace',
                 cancellationNote: !details.canCancel
-                    ? now >= details.cancellationDeadline
-                        ? 'Den vyzvednutí už skončil, rezervaci nelze zrušit.'
-                        : 'Rezervaci už nelze zrušit.'
+                    ? [
+                          now >= details.cancellationDeadline
+                              ? 'Den vyzvednutí už skončil, rezervaci nelze zrušit.'
+                              : 'Rezervaci už nelze zrušit.',
+                      ]
                     : details.cancellationRetainsProduction
-                      ? 'Pečivo pro vás už máme naplánované. Pokud nemůžete přijít, rezervaci prosím zrušte, ať s vámi nepočítáme.'
-                      : `Rezervaci můžete zrušit do konce dne vyzvednutí, nejlépe do ${cutoff}, než naplánujeme pečení. Upravit ji nelze, místo toho ji zrušte a vytvořte novou.`,
+                      ? [
+                            'Pečivo pro vás už máme naplánované. Pokud nemůžete přijít, rezervaci prosím zrušte, ať s vámi nepočítáme.',
+                        ]
+                      : [
+                            `Rezervaci můžete zrušit až do konce dne vyzvednutí. Pokud je to možné, zrušte ji prosím ještě před uzávěrkou (${cutoff}), abychom zbytečně nepekli pečivo navíc.`,
+                            'Pokud chcete rezervaci změnit, zrušte ji a vytvořte novou.',
+                        ],
             };
         case 'cancelled':
             return {
                 heading: 'Rezervace je zrušená',
-                cancellationNote: 'S vyzvednutím nepočítáme. Můžete si vytvořit novou rezervaci.',
+                cancellationNote: ['S vyzvednutím nepočítáme. Můžete si vytvořit novou rezervaci.'],
             };
         case 'picked_up':
             return {
                 heading: 'Rezervace byla vyzvednuta',
-                cancellationNote: 'Rezervace je uzavřená.',
+                cancellationNote: ['Rezervace je uzavřená.'],
             };
         case 'no_show':
             return {
                 heading: 'Rezervace nebyla vyzvednuta',
-                cancellationNote: 'Rezervace je uzavřená.',
+                cancellationNote: ['Rezervace je uzavřená.'],
             };
     }
 };
@@ -125,7 +132,9 @@ const ManagedReservation = async ({
                         details.cancellationChangesAt.getTime() - now.getTime()
                     }
                 >
-                    {cancellationNote}
+                    {cancellationNote.map((paragraph) => (
+                        <p key={paragraph}>{paragraph}</p>
+                    ))}
                 </ReservationCancellation>
             </div>
             <div>
