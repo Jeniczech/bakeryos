@@ -3,7 +3,7 @@ import { describeCancelFailure } from '@/lib/reservations/cancellation';
 
 describe('describeCancelFailure', () => {
     it.each([
-        ['CUTOFF_PASSED', 'CUTOFF_PASSED'],
+        ['PICKUP_DATE_PASSED', 'PICKUP_DATE_PASSED'],
         ['INVALID_TRANSITION', 'NOT_CANCELLABLE'],
         ['RESERVATION_NOT_FOUND', 'NOT_FOUND'],
     ] as const)('maps %s to %s', (code, kind) => {

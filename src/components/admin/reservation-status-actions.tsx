@@ -11,7 +11,6 @@ import type { AdminStatusTarget } from '@/server/domain/reservation-rules';
 const ERROR_MESSAGES: Record<StatusChangeError, string> = {
     INVALID_TRANSITION: 'Stav rezervace se mezitím změnil.',
     FORBIDDEN: 'Tuto změnu nelze provést.',
-    CUTOFF_PASSED: 'Termín pro zrušení už uplynul.',
     BEFORE_PICKUP_DATE: 'Vyzvednutí lze označit až v den vyzvednutí.',
     PICKUP_DATE_PASSED: 'Rezervace s minulým datem vyzvednutí už nelze zrušit.',
     NOT_FOUND: 'Rezervace nebyla nalezena.',

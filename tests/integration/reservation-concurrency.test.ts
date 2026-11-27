@@ -22,7 +22,6 @@ import {
     PickupDateUnavailableError,
     PlanBelowCommitmentsError,
     PlanChangedError,
-    StatusTransitionError,
 } from '@/server/domain/errors';
 import { updateDailyPlan } from '@/server/services/production/update-daily-plan';
 import { cancelReservation } from '@/server/services/reservations/cancel-reservation';
@@ -800,7 +799,7 @@ describe('lock waits that cross the cutoff', () => {
         vi.useRealTimers();
     });
 
-    it('rejects a customer cancellation that obtains its locks at the cutoff', async () => {
+    it('retains the items when a customer cancellation obtains its locks at the cutoff', async () => {
         const bread = await insertProduct(5);
         const created = await createReservation(
             { ...buildInput([{ productId: bread.id, quantity: 2 }]), source: 'online' },
@@ -822,8 +821,12 @@ describe('lock waits that cross the cutoff', () => {
             await holder.release();
         }
 
-        await expect(cancellation).rejects.toBeInstanceOf(StatusTransitionError);
-        await expect(cancellation).rejects.toMatchObject({ code: 'CUTOFF_PASSED' });
+        await expect(cancellation).resolves.toMatchObject({ status: 'cancelled' });
+        const [row] = await getDb()
+            .select()
+            .from(reservations)
+            .where(eq(reservations.id, created.reservationId));
+        expect(row).toMatchObject({ retainForProduction: true, cancelledAt: CUTOFF });
         expect((await readCommitted([bread.id])).get(bread.id)).toBe(2);
     });
 

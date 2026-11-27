@@ -123,7 +123,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - API creates and retrieves reservations without UI.
 - Valid management URL accesses only its reservation.
 - Customer cancellation before cutoff releases capacity.
-- Customer cancellation at/after cutoff is rejected.
+- Customer cancellation at/after cutoff succeeds and retains production commitment.
 - Admin late cancellation retains production commitment.
 - Repeated cancellation has no extra side effects.
 - Exceeding the reservation rate limit returns `429`.

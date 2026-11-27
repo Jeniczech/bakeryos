@@ -27,6 +27,9 @@ const BEFORE_CUTOFF = pragueTimeToInstant('2099-09-15', 12);
 const CUTOFF = pragueTimeToInstant('2099-09-15', 18);
 const JUST_BEFORE_CUTOFF = new Date(CUTOFF.getTime() - 1);
 const AFTER_CUTOFF = pragueTimeToInstant('2099-09-16', 9);
+// Prague midnight ending the pickup date.
+const DEADLINE = pragueTimeToInstant('2099-09-17', 0);
+const JUST_BEFORE_DEADLINE = new Date(DEADLINE.getTime() - 1);
 
 const createdProductIds: string[] = [];
 
@@ -121,17 +124,29 @@ describe('getReservationByToken', () => {
                 },
             ],
             cancellationCutoff: CUTOFF,
+            cancellationDeadline: DEADLINE,
             canCancel: true,
+            cancellationRetainsProduction: false,
+            cancellationChangesAt: CUTOFF,
         });
     });
 
-    it('reports that the customer can no longer cancel at the cutoff', async () => {
+    it('lets the customer cancel from the cutoff until the pickup date ends', async () => {
         const product = await insertProduct();
         const created = await reserve(product.id, 1);
+        const at = (now: Date) => getReservationByToken(created.managementToken, { now });
 
-        const details = await getReservationByToken(created.managementToken, { now: CUTOFF });
-
-        expect(details.canCancel).toBe(false);
+        await expect(at(CUTOFF)).resolves.toMatchObject({
+            canCancel: true,
+            cancellationRetainsProduction: true,
+            cancellationChangesAt: DEADLINE,
+        });
+        await expect(at(JUST_BEFORE_DEADLINE)).resolves.toMatchObject({ canCancel: true });
+        await expect(at(DEADLINE)).resolves.toMatchObject({
+            canCancel: false,
+            cancellationRetainsProduction: false,
+            cancellationChangesAt: null,
+        });
     });
 
     it.each([
@@ -165,22 +180,52 @@ describe('cancelReservation', () => {
         await expect(reserve(product.id, 3)).resolves.toMatchObject({ status: 'confirmed' });
     });
 
-    it('rejects a customer cancellation at the exact cutoff', async () => {
+    it.each([
+        ['at the exact cutoff', CUTOFF],
+        ['on the pickup date', AFTER_CUTOFF],
+        ['just before the pickup date ends', JUST_BEFORE_DEADLINE],
+    ])('keeps the production commitment when a customer cancels %s', async (_label, now) => {
         const product = await insertProduct();
         const created = await reserve(product.id, 2);
 
-        const attempt = cancelReservation(
+        const details = await cancelReservation(
             { actor: 'customer', token: created.managementToken },
-            { now: CUTOFF },
+            { now },
         );
 
-        await expect(attempt).rejects.toBeInstanceOf(StatusTransitionError);
-        await expect(attempt).rejects.toMatchObject({ code: 'CUTOFF_PASSED' });
+        expect(details).toMatchObject({ status: 'cancelled', canCancel: false });
         expect(await readReservation(created.reservationId)).toMatchObject({
-            status: 'confirmed',
-            cancelledAt: null,
+            status: 'cancelled',
+            retainForProduction: true,
+            cancelledAt: now,
+        });
+        expect(await readCommitted(product.id)).toEqual({
+            activeReserved: 0,
+            retainedCancelled: 2,
         });
     });
+
+    it.each(['customer', 'admin'] as const)(
+        'rejects a %s cancellation once the pickup date has ended',
+        async (actor) => {
+            const product = await insertProduct();
+            const created = await reserve(product.id, 2);
+
+            const attempt = cancelReservation(
+                actor === 'customer'
+                    ? { actor, token: created.managementToken }
+                    : { actor, reservationId: created.reservationId },
+                { now: DEADLINE },
+            );
+
+            await expect(attempt).rejects.toBeInstanceOf(StatusTransitionError);
+            await expect(attempt).rejects.toMatchObject({ code: 'PICKUP_DATE_PASSED' });
+            expect(await readReservation(created.reservationId)).toMatchObject({
+                status: 'confirmed',
+                cancelledAt: null,
+            });
+        },
+    );
 
     it('lets a customer cancel one millisecond before the cutoff', async () => {
         const product = await insertProduct();
@@ -312,7 +357,7 @@ describe('cancelReservation', () => {
         const token = created.managementToken;
         await cancelReservation({ actor: 'customer', token }, { now: BEFORE_CUTOFF });
 
-        // After the cutoff: a retry still succeeds instead of reporting the cutoff.
+        // After the cutoff: a retry keeps the original early cancellation.
         const repeated = await cancelReservation(
             { actor: 'customer', token },
             { now: AFTER_CUTOFF },

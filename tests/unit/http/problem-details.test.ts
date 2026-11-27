@@ -31,7 +31,7 @@ describe('mapDomainError', () => {
         ['capacity', new InsufficientCapacityError([]), 409],
         ['idempotency', new IdempotencyConflictError(), 409],
         ['not found', new ReservationNotFoundError(), 404],
-        ['cancellation cutoff', new StatusTransitionError('CUTOFF_PASSED'), 409],
+        ['pickup date passed', new StatusTransitionError('PICKUP_DATE_PASSED'), 409],
         ['invalid transition', new StatusTransitionError('INVALID_TRANSITION'), 409],
         ['forbidden transition', new StatusTransitionError('FORBIDDEN'), 403],
     ])('maps %s to %i', (_label, error, status) => {

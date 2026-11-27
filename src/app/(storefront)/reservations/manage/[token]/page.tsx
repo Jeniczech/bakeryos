@@ -25,20 +25,25 @@ export const metadata: Metadata = {
 /** The page's heading and the cancellation card's text for the reservation's current state. */
 const describeReservation = (
     details: ReservationDetails,
+    now: Date,
 ): { heading: string; cancellationNote: string } => {
     const cutoff = formatPragueDateTime(details.cancellationCutoff);
     switch (details.status) {
         case 'confirmed':
             return {
                 heading: 'Vaše rezervace',
-                cancellationNote: details.canCancel
-                    ? `Rezervaci můžete zrušit do ${cutoff}. Upravit ji nelze, místo toho ji zrušte a vytvořte novou.`
-                    : `Online zrušení bylo možné do ${cutoff}. Pokud nemůžete přijít, zavolejte prosím do pekárny.`,
+                cancellationNote: !details.canCancel
+                    ? now >= details.cancellationDeadline
+                        ? 'Den vyzvednutí už skončil, rezervaci nelze zrušit.'
+                        : 'Rezervaci už nelze zrušit.'
+                    : details.cancellationRetainsProduction
+                      ? 'Pečivo pro vás už máme naplánované. Pokud nemůžete přijít, rezervaci prosím zrušte, ať s vámi nepočítáme.'
+                      : `Rezervaci můžete zrušit do konce dne vyzvednutí, nejlépe do ${cutoff}, než naplánujeme pečení. Upravit ji nelze, místo toho ji zrušte a vytvořte novou.`,
             };
         case 'cancelled':
             return {
                 heading: 'Rezervace je zrušená',
-                cancellationNote: 'Pečivo pro vás nechystáme. Můžete si vytvořit novou rezervaci.',
+                cancellationNote: 'S vyzvednutím nepočítáme. Můžete si vytvořit novou rezervaci.',
             };
         case 'picked_up':
             return {
@@ -67,9 +72,11 @@ const ManagedReservation = async ({
     // Cancellation eligibility depends on the current time, so the page is never cached.
     await connection();
     const { token } = await params;
+    // One instant for the eligibility check, the text and the refresh timer.
+    const now = new Date();
     let details: ReservationDetails;
     try {
-        details = await getReservationByToken(token);
+        details = await getReservationByToken(token, { now });
     } catch (error) {
         unstable_rethrow(error);
         if (error instanceof ReservationNotFoundError) {
@@ -89,7 +96,7 @@ const ManagedReservation = async ({
         // digest, so the sanitized cause appears in the same log entry.
         throw new Error('The reservation could not be loaded.', { cause: describeForLog(error) });
     }
-    const { heading, cancellationNote } = describeReservation(details);
+    const { heading, cancellationNote } = describeReservation(details, now);
     return (
         <section aria-labelledby="reservation-heading" className="flex flex-col gap-6">
             <div className="flex flex-col gap-2">
@@ -113,7 +120,10 @@ const ManagedReservation = async ({
                 <ReservationCancellation
                     token={token}
                     canCancel={details.canCancel}
-                    cancellationCutoff={details.cancellationCutoff.toISOString()}
+                    refreshInMs={
+                        details.cancellationChangesAt &&
+                        details.cancellationChangesAt.getTime() - now.getTime()
+                    }
                 >
                     {cancellationNote}
                 </ReservationCancellation>

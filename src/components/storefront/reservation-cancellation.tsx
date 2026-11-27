@@ -8,14 +8,14 @@ import { readProblemCode } from '@/lib/http/problem-code';
 import { describeCancelFailure, type CancelFailureKind } from '@/lib/reservations/cancellation';
 
 const FAILURE_MESSAGES: Record<CancelFailureKind, string> = {
-    CUTOFF_PASSED: 'Rezervaci se nepodařilo zrušit: termín pro online zrušení už uplynul. Pokud nemůžete přijít, zavolejte prosím do pekárny.',
+    PICKUP_DATE_PASSED: 'Rezervaci se nepodařilo zrušit: den vyzvednutí už skončil.',
     NOT_CANCELLABLE: 'Rezervaci se nepodařilo zrušit: její stav se mezitím změnil.',
     NOT_FOUND: 'Rezervaci se nepodařilo najít.',
     RETRY: 'Rezervaci se nepodařilo zrušit. Zkuste to prosím znovu.',
 };
 
-// The server decides at the cutoff itself; the margin absorbs small client clock offsets.
-const CUTOFF_REFRESH_MARGIN_MS = 1000;
+// Lets the server's clock pass the boundary before the refresh asks it again.
+const BOUNDARY_REFRESH_MARGIN_MS = 1000;
 
 /**
  * The cancellation card. Rendered for every status so it stays mounted when `router.refresh()`
@@ -25,13 +25,17 @@ const CUTOFF_REFRESH_MARGIN_MS = 1000;
 export const ReservationCancellation = ({
     token,
     canCancel,
-    cancellationCutoff,
+    refreshInMs,
     children,
 }: {
     token: string;
     canCancel: boolean;
-    /** ISO instant; the page refreshes when it passes, so stale buttons disappear. */
-    cancellationCutoff: string;
+    /**
+     * Server-measured time until the cancellation options change, or null if they no longer
+     * will. It differs on every render, so each refresh re-arms the timer; measuring it on the
+     * server keeps a wrong client clock from refreshing too early or too late.
+     */
+    refreshInMs: number | null;
     /** The server's description of the current state. */
     children: React.ReactNode;
 }) => {
@@ -41,13 +45,15 @@ export const ReservationCancellation = ({
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
-        if (!canCancel) {
+        if (refreshInMs === null) {
             return;
         }
-        const delay = new Date(cancellationCutoff).getTime() - Date.now();
-        const timer = setTimeout(() => router.refresh(), delay + CUTOFF_REFRESH_MARGIN_MS);
+        const timer = setTimeout(
+            () => router.refresh(),
+            Math.max(refreshInMs, 0) + BOUNDARY_REFRESH_MARGIN_MS,
+        );
         return () => clearTimeout(timer);
-    }, [canCancel, cancellationCutoff, router]);
+    }, [refreshInMs, router]);
 
     const cancel = () => {
         setFailure(null);

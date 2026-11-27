@@ -1,8 +1,8 @@
 /** What a failed customer cancellation tells the customer; the UI maps each kind to its copy. */
-export type CancelFailureKind = 'CUTOFF_PASSED' | 'NOT_CANCELLABLE' | 'NOT_FOUND' | 'RETRY';
+export type CancelFailureKind = 'PICKUP_DATE_PASSED' | 'NOT_CANCELLABLE' | 'NOT_FOUND' | 'RETRY';
 
 const FAILURE_KINDS_BY_CODE: Partial<Record<string, CancelFailureKind>> = {
-    CUTOFF_PASSED: 'CUTOFF_PASSED',
+    PICKUP_DATE_PASSED: 'PICKUP_DATE_PASSED',
     INVALID_TRANSITION: 'NOT_CANCELLABLE',
     RESERVATION_NOT_FOUND: 'NOT_FOUND',
 };
