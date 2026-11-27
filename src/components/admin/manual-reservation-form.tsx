@@ -17,7 +17,7 @@ import {
     reloadPage,
 } from '@/components/ui/outdated-deployment';
 import type { CalendarDate } from '@/lib/date-time/prague';
-import { formatLongDate } from '@/lib/formatting/dates';
+import { formatLongDateAccusative } from '@/lib/formatting/dates';
 import { formatPrice } from '@/lib/formatting/money';
 import type { AvailableProduct } from '@/server/services/products/get-available-products';
 
@@ -205,7 +205,7 @@ export const ManualReservationForm = ({
             {success && (
                 <Notice>
                     Rezervace <strong>{success.reservationNumber}</strong> na{' '}
-                    {formatLongDate(success.pickupDate)} byla vytvořena (celkem{' '}
+                    {formatLongDateAccusative(success.pickupDate)} byla vytvořena (celkem{' '}
                     {formatPrice(success.totalPrice)}).{' '}
                     <Link
                         href={`/admin/reservations?date=${success.pickupDate}`}

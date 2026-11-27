@@ -76,5 +76,7 @@ export const formatPragueDateTime = (instant: Date): string =>
  * An instant as Prague wall-clock time with its preposition, e.g. "v sobotu 28. listopadu
  * v 18:00" or "ve středu 25. listopadu v 18:00".
  */
-export const formatPragueDateTimeWithPreposition = (instant: Date): string =>
-    `${withPreposition(joinAccusative(pragueDateFormatter.formatToParts(instant)))} v ${pragueTimeFormatter.format(instant)}`;
+export const formatPragueDateTimeWithPreposition = (instant: Date): string => {
+    const date = withPreposition(joinAccusative(pragueDateFormatter.formatToParts(instant)));
+    return `${date} v ${pragueTimeFormatter.format(instant)}`;
+};

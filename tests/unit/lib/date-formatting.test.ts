@@ -30,6 +30,8 @@ describe('formatLongDateWithPreposition', () => {
         ['2026-11-23', 'v pondělí 23. listopadu'],
         ['2026-11-25', 've středu 25. listopadu'],
         ['2026-11-26', 've čtvrtek 26. listopadu'],
+        ['2026-11-27', 'v pátek 27. listopadu'],
+        ['2026-11-28', 'v sobotu 28. listopadu'],
         ['2026-11-29', 'v neděli 29. listopadu'],
     ])('formats %s as "%s"', (date, expected) => {
         expect(formatLongDateWithPreposition(date)).toBe(expected);
