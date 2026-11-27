@@ -52,7 +52,9 @@ A single Next.js application, with no separate backend:
 | `pnpm test:integration` | Services and API against real PostgreSQL: concurrent last-unit bookings (checks the final database state), idempotent replay and races, early vs. late cancellation, daily plan overrides, snapshots, admin auth, rate limiting |
 | `pnpm test:e2e`         | Playwright: book, open the management link, cancel                                                                                                                                                                              |
 
-Integration and E2E tests need local PostgreSQL (`pnpm db:up`); details are under [Local setup](#local-setup).
+Integration tests (`pnpm test:integration`, with `pnpm db:up` running) never touch the development database. Each run drops and recreates a separate test database and applies the migrations to it: by default the `DATABASE_URL` database with a `_test` suffix (`bakeryos_test`) on the same server, or `TEST_DATABASE_URL` when set. They assume local Docker PostgreSQL: with a Neon `DATABASE_URL` in `.env`, the test database would be created on Neon. Its name must end in `_test`, otherwise the run is refused. Tests create the data they need and need no seed.
+
+The E2E test (`pnpm test:e2e`, with `pnpm db:up` running; once, `pnpm exec playwright install chromium`) books, opens the management link, and cancels in Chromium. Playwright recreates and seeds its own database (`DATABASE_URL` with an `_e2e_test` suffix, or `E2E_DATABASE_URL`), then builds the app and serves it on port 3100 against that database, so development data and a running dev server are untouched. Like the integration tests, it assumes local Docker PostgreSQL: with a Neon `DATABASE_URL` in `.env`, the E2E database would be created on Neon. Its name must end in `_test`. It picks the first bookable date, so it runs at any time of day.
 
 ## Requirements
 
@@ -65,27 +67,34 @@ Integration and E2E tests need local PostgreSQL (`pnpm db:up`); details are unde
 ```sh
 pnpm install
 cp .env.example .env       # local defaults point at Docker PostgreSQL
+```
+
+Fill in `.env`:
+
+- `MANAGEMENT_TOKEN_SECRET`: min. 32 characters, e.g. `openssl rand -base64 32`. Reservation management tokens are derived from it, so it is needed before creating reservations or running integration tests.
+- `AUTH_SECRET`: e.g. `openssl rand -base64 32`. Auth.js encrypts the admin session cookie with it.
+- `ADMIN_SEED_EMAIL` and `ADMIN_SEED_PASSWORD` (min. 12 characters): the administrator the seed creates.
+
+Then:
+
+```sh
 pnpm db:up                 # start PostgreSQL 18 and wait until healthy
 pnpm db:migrate            # apply migrations to the local database
-pnpm db:seed               # schedule, demo catalog, admin (set ADMIN_SEED_PASSWORD first)
+pnpm db:seed               # schedule, demo catalog, admin
 pnpm dev                   # http://localhost:3000
 ```
 
-Set `MANAGEMENT_TOKEN_SECRET` in `.env` (min. 32 characters, e.g. `openssl rand -base64 32`) before creating reservations or running integration tests: reservation management tokens are derived from it.
+`GET /api/health` returns `{"status":"ok","database":"ok"}` when the database is reachable, `503` otherwise.
 
-Integration tests (`pnpm test:integration`, with `pnpm db:up` running) never touch the development database. Each run drops and recreates a separate test database and applies the migrations to it: by default the `DATABASE_URL` database with a `_test` suffix (`bakeryos_test`) on the same server, or `TEST_DATABASE_URL` when set. They assume local Docker PostgreSQL: with a Neon `DATABASE_URL` in `.env`, the test database would be created on Neon. Its name must end in `_test`, otherwise the run is refused. Tests create the data they need and need no seed.
+## Admin
 
-The E2E test (`pnpm test:e2e`, with `pnpm db:up` running; once, `pnpm exec playwright install chromium`) books, opens the management link, and cancels in Chromium. Playwright recreates and seeds its own database (`DATABASE_URL` with an `_e2e_test` suffix, or `E2E_DATABASE_URL`), then builds the app and serves it on port 3100 against that database, so development data and a running dev server are untouched. Like the integration tests, it assumes local Docker PostgreSQL: with a Neon `DATABASE_URL` in `.env`, the E2E database would be created on Neon. Its name must end in `_test`. It picks the first bookable date, so it runs at any time of day.
-
-Set `AUTH_SECRET` in `.env` (e.g. `openssl rand -base64 32`) before signing in: Auth.js encrypts the admin session cookie with it. The admin signs in at `/admin/login` with `ADMIN_SEED_EMAIL` and `ADMIN_SEED_PASSWORD`. Sessions last 8 hours and are not checked against the database, so resetting the password through the seed does not end existing sessions; rotating `AUTH_SECRET` does.
+The admin signs in at `/admin/login` with `ADMIN_SEED_EMAIL` and `ADMIN_SEED_PASSWORD`. Sessions last 8 hours and are not checked against the database, so resetting the password through the seed does not end existing sessions; rotating `AUTH_SECRET` does.
 
 The seed is safe to re-run: it upserts the opening days and administrator (resetting the admin password from `ADMIN_SEED_PASSWORD`, min. 12 characters), adds missing closures, and inserts the demo catalog only when the `products` table is empty.
 
 Products are managed at `/admin/products`. Unchecking **Aktivní** deactivates a product: it disappears from the catalog and cannot be reserved, while existing reservations keep their name and price snapshots. A new product has no weekday restrictions, so it is offered on every open day (the weekday editor is deferred). Changed default capacity and walk-in quantity apply only to dates without a daily plan yet. Saving a product invalidates the storefront's cached catalog immediately. A save is rejected if the product was changed after the form was loaded (in another tab, by browser back/forward, or by a second admin), so an outdated form never undoes a newer change.
 
 The production view at `/admin/production` lists, per date, the products offered that day plus any product with reservations still counted in production (for example one deactivated since, labelled as such). It shows reserved units, late cancellations (which stay in production), walk-in quantity, the recommended quantity to bake and the remaining availability; dates without a daily plan use the product defaults. Capacity and walk-in quantity can be overridden per product for today through today+7, never below walk-ins plus already committed units. A save is rejected if the plan changed after the row was loaded, so an outdated form never undoes another save. Past dates are read-only and show only stored plans, so later changes to product defaults or the catalog never rewrite history.
-
-`GET /api/health` returns `{"status":"ok","database":"ok"}` when the database is reachable, `503` otherwise.
 
 ## Public API
 
