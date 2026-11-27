@@ -342,6 +342,62 @@ describe('concurrent reservations', () => {
             new Set(fulfilled.map((result) => result.reservationId)),
         );
     });
+
+    it('takes nothing from a shared product when an overlapping cart is short elsewhere', async () => {
+        // Rolls sort first, so every cart queues on the rolls row in order and the cake shortage
+        // is found on the second item, after the second cart has claimed a roll.
+        const [rolls, cake] = (await Promise.all([insertProduct(2), insertProduct(2)])).sort(
+            (left, right) => left.id.localeCompare(right.id),
+        );
+        const carts = [
+            [
+                { productId: rolls.id, quantity: 1 },
+                { productId: cake.id, quantity: 2 },
+            ],
+            [
+                { productId: rolls.id, quantity: 1 },
+                { productId: cake.id, quantity: 1 },
+            ],
+            [{ productId: rolls.id, quantity: 1 }],
+        ];
+
+        // The last roll stays free for the third cart only if the second cart takes nothing.
+        const holder = await holdPlanLocks([rolls.id, cake.id]);
+        const pending: Promise<CreateReservationResult>[] = [];
+        try {
+            for (const [index, cart] of carts.entries()) {
+                pending.push((await holder.queue(() => reserve(cart), index + 1)).result);
+            }
+        } finally {
+            await holder.release();
+        }
+        const [first, second, third] = await Promise.allSettled(pending);
+
+        expect(first.status).toBe('fulfilled');
+        expect(third.status).toBe('fulfilled');
+        expect(second).toMatchObject({ status: 'rejected' });
+        if (second.status !== 'rejected') {
+            return;
+        }
+        expect(second.reason).toBeInstanceOf(InsufficientCapacityError);
+        expect((second.reason as InsufficientCapacityError).shortages).toContainEqual({
+            productId: cake.id,
+            requested: 1,
+            available: 0,
+        });
+
+        expect(await readCommitted([rolls.id, cake.id])).toEqual(
+            new Map([
+                [rolls.id, 2],
+                [cake.id, 2],
+            ]),
+        );
+        const stored = await getDb()
+            .select({ reservationId: reservationItems.reservationId })
+            .from(reservationItems)
+            .where(inArray(reservationItems.productId, [rolls.id, cake.id]));
+        expect(stored).toHaveLength(3);
+    });
 });
 
 describe('reservation concurrent with capacity reduction', () => {
