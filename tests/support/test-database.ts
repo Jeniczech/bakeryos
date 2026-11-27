@@ -9,7 +9,12 @@ import { Client } from 'pg';
  */
 const resolveDatabaseUrl = (explicitVariable: string, suffix: string): string => {
     const explicitUrl = process.env[explicitVariable]?.trim();
-    const url = new URL(explicitUrl || deriveDatabaseUrl(explicitVariable, suffix));
+    return assertTestDatabaseUrl(explicitUrl || deriveDatabaseUrl(explicitVariable, suffix));
+};
+
+/** Returns the URL if its database name ends in `_test`, the guard before anything is dropped. */
+export const assertTestDatabaseUrl = (databaseUrl: string): string => {
+    const url = new URL(databaseUrl);
     if (!getDatabaseName(url).endsWith('_test')) {
         throw new Error(
             `Refusing to use "${getDatabaseName(url)}" for tests: they drop and recreate the ` +

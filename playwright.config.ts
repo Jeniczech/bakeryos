@@ -29,7 +29,7 @@ export default defineConfig({
     },
     projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
     webServer: {
-        command: `node tests/e2e/prepare-database.ts && npx next build && npx next start --port ${PORT}`,
+        command: `node tests/e2e/prepare-database.ts && pnpm exec next build && pnpm exec next start --port ${PORT}`,
         url: BASE_URL,
         // Always start fresh: a reused server would skip recreating the database.
         reuseExistingServer: false,
