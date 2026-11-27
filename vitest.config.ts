@@ -7,13 +7,16 @@ if (existsSync('.env')) {
     process.loadEnvFile('.env');
 }
 
-/** Unit tests need no database; when the URL cannot be resolved, global setup reports why. */
+/**
+ * Unit tests need no database; when the URL cannot be resolved, global setup reports why. The
+ * empty URLs keep integration workers off the development database even if setup were skipped.
+ */
 const resolveIntegrationEnv = (): Record<string, string> => {
     try {
         const url = getTestDatabaseUrl();
         return { DATABASE_URL: url, DATABASE_URL_UNPOOLED: url };
     } catch {
-        return {};
+        return { DATABASE_URL: '', DATABASE_URL_UNPOOLED: '' };
     }
 };
 
