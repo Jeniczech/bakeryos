@@ -6,7 +6,6 @@ import {
     checkStatusTransition,
     getCancellationDeadline,
     getReservationCutoff,
-    isBeforeReservationCutoff,
     type ReservationStatus,
 } from '@/server/domain/reservation-rules';
 import { compareConfirmationItems, type ReservationConfirmationItem } from './create-reservation';
@@ -27,8 +26,13 @@ export type ReservationDetails = {
     cancellationDeadline: Date;
     /** Whether the customer may still cancel: `confirmed` and the pickup day has not ended. */
     canCancel: boolean;
-    /** Whether the cutoff has passed, so a cancellation now would keep the items in production. */
-    isPastCutoff: boolean;
+    /** Whether a customer cancellation now would keep the items in production (after cutoff). */
+    cancellationRetainsProduction: boolean;
+    /**
+     * When the customer's cancellation options next change: the cutoff, then the deadline;
+     * null once the customer can no longer cancel.
+     */
+    cancellationChangesAt: Date | null;
 };
 
 /** Returns null for malformed and unknown tokens alike. */
@@ -55,6 +59,16 @@ const loadDetails = async (
     if (!reservation) {
         throw new ReservationNotFoundError();
     }
+    const cutoff = getReservationCutoff(reservation.pickupDate);
+    const deadline = getCancellationDeadline(reservation.pickupDate);
+    const cancellation = checkStatusTransition({
+        from: reservation.status,
+        to: 'cancelled',
+        actor: 'customer',
+        pickupDate: reservation.pickupDate,
+        now,
+    });
+    const retainsProduction = cancellation.ok && cancellation.retainForProduction;
     const items = await db
         .select({
             productId: reservationItems.productId,
@@ -72,16 +86,11 @@ const loadDetails = async (
         customerName: reservation.customerName,
         totalPrice: items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
         items: items.sort(compareConfirmationItems),
-        cancellationCutoff: getReservationCutoff(reservation.pickupDate),
-        cancellationDeadline: getCancellationDeadline(reservation.pickupDate),
-        canCancel: checkStatusTransition({
-            from: reservation.status,
-            to: 'cancelled',
-            actor: 'customer',
-            pickupDate: reservation.pickupDate,
-            now,
-        }).ok,
-        isPastCutoff: !isBeforeReservationCutoff(reservation.pickupDate, now),
+        cancellationCutoff: cutoff,
+        cancellationDeadline: deadline,
+        canCancel: cancellation.ok,
+        cancellationRetainsProduction: retainsProduction,
+        cancellationChangesAt: cancellation.ok ? (retainsProduction ? deadline : cutoff) : null,
     };
 };
 

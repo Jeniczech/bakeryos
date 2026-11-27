@@ -126,7 +126,8 @@ describe('getReservationByToken', () => {
             cancellationCutoff: CUTOFF,
             cancellationDeadline: DEADLINE,
             canCancel: true,
-            isPastCutoff: false,
+            cancellationRetainsProduction: false,
+            cancellationChangesAt: CUTOFF,
         });
     });
 
@@ -135,9 +136,17 @@ describe('getReservationByToken', () => {
         const created = await reserve(product.id, 1);
         const at = (now: Date) => getReservationByToken(created.managementToken, { now });
 
-        await expect(at(CUTOFF)).resolves.toMatchObject({ canCancel: true, isPastCutoff: true });
+        await expect(at(CUTOFF)).resolves.toMatchObject({
+            canCancel: true,
+            cancellationRetainsProduction: true,
+            cancellationChangesAt: DEADLINE,
+        });
         await expect(at(JUST_BEFORE_DEADLINE)).resolves.toMatchObject({ canCancel: true });
-        await expect(at(DEADLINE)).resolves.toMatchObject({ canCancel: false });
+        await expect(at(DEADLINE)).resolves.toMatchObject({
+            canCancel: false,
+            cancellationRetainsProduction: false,
+            cancellationChangesAt: null,
+        });
     });
 
     it.each([

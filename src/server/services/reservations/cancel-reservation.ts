@@ -70,9 +70,9 @@ const cancelInTransaction = async (
 };
 
 /**
- * Cancels a confirmed reservation under the shared locking protocol (TDD §6.4). Customers
- * may cancel only strictly before the cutoff; an admin cancellation at or after it keeps the
- * items committed (`retain_for_production`). Cancelling an already-cancelled reservation
+ * Cancels a confirmed reservation under the shared locking protocol (TDD §6.4). Customers and
+ * admins may cancel until the pickup date ends; a cancellation at or after the cutoff keeps
+ * the items committed (`retain_for_production`). Cancelling an already-cancelled reservation
  * returns its current state without writing. Deadlocks and serialization failures are
  * retried. `now` is injectable for tests and otherwise read after locking.
  */

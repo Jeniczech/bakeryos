@@ -14,7 +14,7 @@ const FAILURE_MESSAGES: Record<CancelFailureKind, string> = {
     RETRY: 'Rezervaci se nepodařilo zrušit. Zkuste to prosím znovu.',
 };
 
-// The server decides at each boundary itself; the margin absorbs small client clock offsets.
+// Lets the server's clock pass the boundary before the refresh asks it again.
 const BOUNDARY_REFRESH_MARGIN_MS = 1000;
 
 /**
@@ -25,15 +25,17 @@ const BOUNDARY_REFRESH_MARGIN_MS = 1000;
 export const ReservationCancellation = ({
     token,
     canCancel,
-    cancellationCutoff,
-    cancellationDeadline,
+    refreshInMs,
     children,
 }: {
     token: string;
     canCancel: boolean;
-    /** ISO instants; the page refreshes when each passes, so the text and button stay current. */
-    cancellationCutoff: string;
-    cancellationDeadline: string;
+    /**
+     * Server-measured time until the cancellation options change, or null if they no longer
+     * will. It differs on every render, so each refresh re-arms the timer; measuring it on the
+     * server keeps a wrong client clock from refreshing too early or too late.
+     */
+    refreshInMs: number | null;
     /** The server's description of the current state. */
     children: React.ReactNode;
 }) => {
@@ -43,18 +45,15 @@ export const ReservationCancellation = ({
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
-        if (!canCancel) {
+        if (refreshInMs === null) {
             return;
         }
-        const now = Date.now();
-        const cutoff = new Date(cancellationCutoff).getTime();
-        const nextBoundary = now < cutoff ? cutoff : new Date(cancellationDeadline).getTime();
         const timer = setTimeout(
             () => router.refresh(),
-            nextBoundary - now + BOUNDARY_REFRESH_MARGIN_MS,
+            Math.max(refreshInMs, 0) + BOUNDARY_REFRESH_MARGIN_MS,
         );
         return () => clearTimeout(timer);
-    }, [canCancel, cancellationCutoff, cancellationDeadline, router]);
+    }, [refreshInMs, router]);
 
     const cancel = () => {
         setFailure(null);
