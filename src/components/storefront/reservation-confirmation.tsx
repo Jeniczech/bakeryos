@@ -11,7 +11,7 @@ import { ReservationItems } from './reservation-items';
 
 /** A replay reports the reservation's current status, which may have changed since. */
 const HEADINGS: Record<ReservationConfirmation['status'], string> = {
-    confirmed: 'Rezervace je hotová',
+    confirmed: 'Vaše rezervace je potvrzena!',
     cancelled: 'Tato rezervace je zrušená',
     picked_up: 'Tato rezervace už byla vyzvednuta',
     no_show: 'Tato rezervace nebyla vyzvednuta',
@@ -63,8 +63,8 @@ const ConfirmationDetails = ({ confirmation }: { confirmation: ReservationConfir
                     Odkaz na rezervaci
                 </h2>
                 <p className="text-sm text-stone-600">
-                    Uložte si tento odkaz. Přes něj rezervaci zobrazíte nebo zrušíte. Nikomu ho
-                    neposílejte.
+                    Uložte si tento odkaz pro zobrazení nebo zrušení rezervace. Odkaz je soukromý, s
+                    nikým ho nesdílejte.
                 </p>
                 <a
                     href={confirmation.managementUrl}

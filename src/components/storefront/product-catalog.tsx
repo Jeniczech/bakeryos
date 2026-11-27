@@ -2,7 +2,7 @@ import { cacheLife, cacheTag } from 'next/cache';
 import Image from 'next/image';
 import { Suspense } from 'react';
 import { Notice } from '@/components/ui/notice';
-import { formatLongDate, formatPragueDateTime } from '@/lib/formatting/dates';
+import { formatLongDateAccusative, formatPragueDateTime } from '@/lib/formatting/dates';
 import { getReservationCutoff } from '@/server/domain/reservation-rules';
 import { getPickupDates } from '@/server/services/eligibility';
 import { getOfferedProducts } from '@/server/services/products/get-offered-products';
@@ -48,7 +48,7 @@ export const ProductCatalog = async ({ pickupDate }: { pickupDate: string }) => 
         <section aria-labelledby="catalog-heading" className="flex flex-col gap-4">
             <div className="flex flex-col gap-1">
                 <h2 id="catalog-heading" className="text-lg font-semibold text-amber-950">
-                    Nabídka na vyzvednutí: {formatLongDate(pickupDate)}
+                    Nabídka pečiva na {formatLongDateAccusative(pickupDate)}
                 </h2>
                 <p className="text-sm text-stone-600">
                     Uzávěrka objednávek: {formatPragueDateTime(getReservationCutoff(pickupDate))}

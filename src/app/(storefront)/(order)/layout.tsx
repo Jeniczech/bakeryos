@@ -53,8 +53,8 @@ const OrderLayout = ({ children }: LayoutProps<'/'>) => (
                             Rezervujte si pečivo
                         </h1>
                         <p className="text-stone-600">
-                            Vyberte den vyzvednutí, zvolte chléb a pečivo a zaplaťte až při
-                            převzetí. Objednávky přijímáme do 18:00 předchozího dne.
+                            Rezervujte si své oblíbené pečivo a zaplaťte až při vyzvednutí.
+                            Rezervace přijímáme do 18:00 předchozího dne.
                         </p>
                     </section>
                     <Suspense fallback={<Notice>Načítáme dny vyzvednutí…</Notice>}>
