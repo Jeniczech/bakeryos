@@ -52,6 +52,13 @@ const joinAccusative = (parts: Intl.DateTimeFormatPart[]): string =>
 export const formatLongDateAccusative = (date: CalendarDate): string =>
     joinAccusative(longDateFormatter.formatToParts(toUtcMidnight(date)));
 
+const withPreposition = (accusativeDate: string): string =>
+    `${/^(středu|čtvrtek)/.test(accusativeDate) ? 've' : 'v'} ${accusativeDate}`;
+
+/** The long date with its preposition, e.g. "v sobotu 28. listopadu", "ve středu 25. listopadu". */
+export const formatLongDateWithPreposition = (date: CalendarDate): string =>
+    withPreposition(formatLongDateAccusative(date));
+
 /** e.g. `{ weekday: 'st', dayMonth: '25. 11.' }`, for compact date pickers. */
 export const formatShortDate = (date: CalendarDate): { weekday: string; dayMonth: string } => ({
     weekday: weekdayFormatter.format(toUtcMidnight(date)),
@@ -70,7 +77,6 @@ export const formatPragueDateTime = (instant: Date): string =>
  * v 18:00" or "ve středu 25. listopadu v 18:00".
  */
 export const formatPragueDateTimeWithPreposition = (instant: Date): string => {
-    const date = joinAccusative(pragueDateFormatter.formatToParts(instant));
-    const preposition = /^(středu|čtvrtek)/.test(date) ? 've' : 'v';
-    return `${preposition} ${date} v ${pragueTimeFormatter.format(instant)}`;
+    const date = withPreposition(joinAccusative(pragueDateFormatter.formatToParts(instant)));
+    return `${date} v ${pragueTimeFormatter.format(instant)}`;
 };

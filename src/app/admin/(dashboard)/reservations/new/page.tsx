@@ -12,7 +12,7 @@ import { SECONDARY_BUTTON_CLASSES, SELECTED_BUTTON_CLASSES } from '@/components/
 import { LoadingNotice } from '@/components/ui/loading-notice';
 import { Notice } from '@/components/ui/notice';
 import { isValidCalendarDate, type CalendarDate } from '@/lib/date-time/prague';
-import { formatLongDate, formatShortDate } from '@/lib/formatting/dates';
+import { formatLongDateWithPreposition, formatShortDate } from '@/lib/formatting/dates';
 import { requireAdmin } from '@/server/auth/require-admin';
 import { PickupDateUnavailableError } from '@/server/domain/errors';
 import type { PickupDateOption } from '@/server/domain/reservation-rules';
@@ -103,7 +103,7 @@ const NewReservationContent = async ({ searchParams }: { searchParams: SearchPar
                 <DatePicker dates={dates} selected={date} />
                 <DateTransitionContent>
                     <h2 className="text-xl font-semibold text-amber-950">
-                        Vyzvednutí {formatLongDate(date)}
+                        Vyzvednutí {formatLongDateWithPreposition(date)}
                     </h2>
                     <ReservationFormSection date={date} now={now} />
                 </DateTransitionContent>

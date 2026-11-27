@@ -5,7 +5,7 @@ import { useState, useSyncExternalStore } from 'react';
 import { SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
 import type { ReservationConfirmation } from '@/lib/cart/checkout';
-import { formatLongDate } from '@/lib/formatting/dates';
+import { formatLongDateWithPreposition } from '@/lib/formatting/dates';
 import { parseStoredConfirmation, readStoredConfirmationRaw } from './checkout-storage';
 import { ReservationItems } from './reservation-items';
 
@@ -49,7 +49,7 @@ const ConfirmationDetails = ({ confirmation }: { confirmation: ReservationConfir
                 <strong className="font-semibold text-amber-950">
                     {confirmation.reservationNumber}
                 </strong>
-                , vyzvednutí {formatLongDate(confirmation.pickupDate)}.
+                , vyzvednutí {formatLongDateWithPreposition(confirmation.pickupDate)}.
                 {confirmation.status === 'confirmed' && ' Zaplatíte až při vyzvednutí.'}
             </p>
         </div>
