@@ -364,6 +364,23 @@ describe('competing status changes', () => {
         });
     });
 
+    it('accepts the same outcome submitted twice at once, writing it once', async () => {
+        const product = await insertProduct();
+        const created = await reserve([{ productId: product.id, quantity: 1 }]);
+        const reservationId = created.reservationId;
+        const holder = await holdReservationLock(reservationId);
+
+        const submit = () =>
+            updateReservationStatus({ reservationId, status: 'picked_up' }, { now: PICKUP_DAY });
+        const first = await holder.queue(submit, 1);
+        const second = await holder.queue(submit, 2);
+        await holder.release();
+
+        await expect(first.result).resolves.toBeUndefined();
+        await expect(second.result).resolves.toBeUndefined();
+        expect(await readReservation(reservationId)).toMatchObject({ status: 'picked_up' });
+    });
+
     it('rejects picked_up when a late admin cancellation commits first', async () => {
         const product = await insertProduct();
         const created = await reserve([{ productId: product.id, quantity: 2 }]);

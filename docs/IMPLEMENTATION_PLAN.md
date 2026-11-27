@@ -189,7 +189,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Test overlapping multi-product requests.
 - [x] Test same/different payload idempotency replay.
 - [x] Test early/late cancellation and admin cutoff enforcement.
-- [ ] Test concurrent capacity edits and status changes.
+- [x] Test concurrent capacity edits and status changes.
 - [ ] Test first-write daily-plan snapshots.
 - [ ] Implement one Playwright customer flow: date → cart → checkout → confirmation → management → cancellation.
 - [ ] Run typecheck, lint, build, and test suites.

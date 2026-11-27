@@ -21,6 +21,7 @@ import {
     InsufficientCapacityError,
     PickupDateUnavailableError,
     PlanBelowCommitmentsError,
+    PlanChangedError,
     StatusTransitionError,
 } from '@/server/domain/errors';
 import { updateDailyPlan } from '@/server/services/production/update-daily-plan';
@@ -37,6 +38,7 @@ const WEDNESDAY = 3;
 const BEFORE_CUTOFF = pragueTimeToInstant('2099-07-14', 12);
 const CUTOFF = pragueTimeToInstant('2099-07-14', 18);
 const JUST_BEFORE_CUTOFF = new Date(CUTOFF.getTime() - 100);
+const AFTER_CUTOFF = pragueTimeToInstant('2099-07-14', 20);
 
 /**
  * A separate pool for the lock holder and lock-wait polling, so the services under test can
@@ -608,6 +610,152 @@ describe('cancellation concurrent with a new reservation', () => {
 
         await expect(reservation).rejects.toBeInstanceOf(InsufficientCapacityError);
         await expect(cancellation).resolves.toMatchObject({ status: 'cancelled' });
+        expect((await readCommitted([bread.id])).get(bread.id)).toBe(0);
+    });
+});
+
+describe('concurrent capacity edits', () => {
+    const savePlan = (
+        productId: string,
+        capacity: number,
+        options: { expected?: { capacity: number; walkInQuantity: number }; now?: Date } = {},
+    ) =>
+        updateDailyPlan(
+            {
+                productId,
+                date: PICKUP_DATE,
+                capacity,
+                walkInQuantity: 0,
+                expected: options.expected,
+            },
+            { now: options.now ?? BEFORE_CUTOFF },
+        );
+
+    it('rejects the second of two saves based on the same loaded values', async () => {
+        const bread = await insertProduct(10);
+        const loaded = { capacity: 10, walkInQuantity: 0 };
+
+        const holder = await holdPlanLocks([bread.id]);
+        let first: Promise<unknown> | undefined;
+        let second: Promise<unknown> | undefined;
+        try {
+            first = (await holder.queue(() => savePlan(bread.id, 8, { expected: loaded }), 1))
+                .result;
+            second = (await holder.queue(() => savePlan(bread.id, 12, { expected: loaded }), 2))
+                .result;
+        } finally {
+            await holder.release();
+        }
+
+        await expect(first).resolves.toMatchObject({ capacity: 8 });
+        await expect(second).rejects.toBeInstanceOf(PlanChangedError);
+        expect(await readPlan(bread.id)).toMatchObject({ capacity: 8, walkInQuantity: 0 });
+    });
+
+    it('lets a reduction use capacity released by an early cancellation that commits first', async () => {
+        const bread = await insertProduct(5);
+        const existing = await reserve([{ productId: bread.id, quantity: 4 }]);
+
+        const holder = await holdPlanLocks([bread.id]);
+        let cancellation: Promise<unknown> | undefined;
+        let reduction: Promise<unknown> | undefined;
+        try {
+            cancellation = (
+                await holder.queue(
+                    () =>
+                        cancelReservation(
+                            { actor: 'admin', reservationId: existing.reservationId },
+                            { now: BEFORE_CUTOFF },
+                        ),
+                    1,
+                )
+            ).result;
+            reduction = (await holder.queue(() => savePlan(bread.id, 2), 2)).result;
+        } finally {
+            await holder.release();
+        }
+
+        await expect(cancellation).resolves.toMatchObject({ status: 'cancelled' });
+        await expect(reduction).resolves.toMatchObject({ capacity: 2 });
+        expect(await readPlan(bread.id)).toMatchObject({ capacity: 2 });
+        expect((await readCommitted([bread.id])).get(bread.id)).toBe(0);
+    });
+
+    it('rejects a reduction queued behind a late cancellation, whose items stay committed', async () => {
+        const bread = await insertProduct(5);
+        const existing = await reserve([{ productId: bread.id, quantity: 4 }]);
+
+        const holder = await holdPlanLocks([bread.id]);
+        let cancellation: Promise<unknown> | undefined;
+        let reduction: Promise<unknown> | undefined;
+        try {
+            cancellation = (
+                await holder.queue(
+                    () =>
+                        cancelReservation(
+                            { actor: 'admin', reservationId: existing.reservationId },
+                            { now: AFTER_CUTOFF },
+                        ),
+                    1,
+                )
+            ).result;
+            reduction = (await holder.queue(() => savePlan(bread.id, 2, { now: AFTER_CUTOFF }), 2))
+                .result;
+        } finally {
+            await holder.release();
+        }
+
+        await expect(cancellation).resolves.toMatchObject({ status: 'cancelled' });
+        await expect(reduction).rejects.toBeInstanceOf(PlanBelowCommitmentsError);
+        expect(await readPlan(bread.id)).toMatchObject({ capacity: 5 });
+        expect((await readCommitted([bread.id])).get(bread.id)).toBe(4);
+    });
+});
+
+describe('concurrent cancellations of one reservation', () => {
+    it('records only the first when a customer and an admin cancel at once', async () => {
+        const bread = await insertProduct(5);
+        const created = await createReservation(
+            { ...buildInput([{ productId: bread.id, quantity: 3 }]), source: 'online' },
+            { now: BEFORE_CUTOFF },
+        );
+
+        const holder = await holdPlanLocks([bread.id]);
+        let byCustomer: Promise<unknown> | undefined;
+        let byAdmin: Promise<unknown> | undefined;
+        try {
+            byCustomer = (
+                await holder.queue(
+                    () =>
+                        cancelReservation(
+                            { actor: 'customer', token: created.managementToken },
+                            { now: BEFORE_CUTOFF },
+                        ),
+                    1,
+                )
+            ).result;
+            // Late, so a second write would flip retain_for_production and release nothing.
+            byAdmin = (
+                await holder.queue(
+                    () =>
+                        cancelReservation(
+                            { actor: 'admin', reservationId: created.reservationId },
+                            { now: AFTER_CUTOFF },
+                        ),
+                    2,
+                )
+            ).result;
+        } finally {
+            await holder.release();
+        }
+
+        await expect(byCustomer).resolves.toMatchObject({ status: 'cancelled' });
+        await expect(byAdmin).resolves.toMatchObject({ status: 'cancelled' });
+        const [row] = await getDb()
+            .select()
+            .from(reservations)
+            .where(eq(reservations.id, created.reservationId));
+        expect(row).toMatchObject({ retainForProduction: false, cancelledAt: BEFORE_CUTOFF });
         expect((await readCommitted([bread.id])).get(bread.id)).toBe(0);
     });
 });
