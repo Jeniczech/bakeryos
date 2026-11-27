@@ -192,7 +192,7 @@ The estimates are planning targets, not guarantees. Stage 3 is the critical chec
 - [x] Test concurrent capacity edits and status changes.
 - [x] Test first-write daily-plan snapshots.
 - [x] Implement one Playwright customer flow: date → cart → checkout → confirmation → management → cancellation.
-- [ ] Run typecheck, lint, build, and test suites.
+- [x] Run typecheck, lint, build, and test suites.
 
 ### Acceptance criteria
 
