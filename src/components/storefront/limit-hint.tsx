@@ -7,8 +7,8 @@ import {
 /** Short enough to fit beside the stepper in two lines, so the card never changes height. */
 const QUANTITY_LIMIT_MESSAGES: Record<QuantityLimit, string> = {
     AVAILABILITY: 'Víc kusů už nezbývá.',
-    PRODUCT_LIMIT: `Online max. ${ONLINE_MAX_UNITS_PER_PRODUCT} ks. Víc vyřídíme po telefonu.`,
-    RESERVATION_LIMIT: `Online max. ${ONLINE_MAX_UNITS_PER_RESERVATION} ks celkem. Víc vyřídíme po telefonu.`,
+    PRODUCT_LIMIT: `Online max. ${ONLINE_MAX_UNITS_PER_PRODUCT} ks.`,
+    RESERVATION_LIMIT: `Online max. ${ONLINE_MAX_UNITS_PER_RESERVATION} ks celkem.`,
 };
 
 /**
