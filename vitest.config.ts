@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
-import { getTestDatabaseUrl } from './tests/integration/test-database';
+import { getTestDatabaseUrl } from './tests/support/test-database.ts';
 
 if (existsSync('.env')) {
     process.loadEnvFile('.env');

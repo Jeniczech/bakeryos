@@ -25,6 +25,8 @@ Set `MANAGEMENT_TOKEN_SECRET` in `.env` (min. 32 characters, e.g. `openssl rand 
 
 Integration tests (`pnpm test:integration`, with `pnpm db:up` running) never touch the development database. Each run drops and recreates a separate test database and applies the migrations to it: by default the `DATABASE_URL` database with a `_test` suffix (`bakeryos_test`) on the same server, or `TEST_DATABASE_URL` when set. They assume local Docker PostgreSQL: with a Neon `DATABASE_URL` in `.env`, the test database would be created on Neon. Its name must end in `_test`, otherwise the run is refused. Tests create the data they need and need no seed.
 
+The E2E test (`pnpm test:e2e`, with `pnpm db:up` running; once, `pnpm exec playwright install chromium`) books, opens the management link, and cancels in Chromium. Playwright recreates and seeds its own database (`DATABASE_URL` with an `_e2e_test` suffix, or `E2E_DATABASE_URL`), then builds the app and serves it on port 3100 against that database, so development data and a running dev server are untouched. It picks the first bookable date, so it runs at any time of day.
+
 Set `AUTH_SECRET` in `.env` (e.g. `openssl rand -base64 32`) before signing in: Auth.js encrypts the admin session cookie with it. The admin signs in at `/admin/login` with `ADMIN_SEED_EMAIL` and `ADMIN_SEED_PASSWORD`. Sessions last 8 hours and are not checked against the database, so resetting the password through the seed does not end existing sessions; rotating `AUTH_SECRET` does.
 
 The seed is safe to re-run: it upserts the opening days and administrator (resetting the admin password from `ADMIN_SEED_PASSWORD`, min. 12 characters), adds missing closures, and inserts the demo catalog only when the `products` table is empty.
@@ -67,6 +69,7 @@ Management links (`/reservations/manage/:token`) are built from `APP_URL` when i
 | `lint`, `typecheck`, `format`, `format:check` | Code quality                                                       |
 | `test`                                        | Unit tests (`tests/unit`)                                          |
 | `test:integration`                            | Integration tests against an isolated PostgreSQL database          |
+| `test:e2e`                                    | Playwright customer flow against a seeded E2E database             |
 | `db:up`, `db:down`                            | Start/stop local PostgreSQL                                        |
 | `db:generate`                                 | Generate a migration from `src/server/db/schema.ts`                |
 | `db:migrate`                                  | Apply migrations to the database in `.env`                         |
