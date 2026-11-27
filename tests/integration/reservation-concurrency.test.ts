@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { pragueTimeToInstant } from '@/lib/date-time/prague';
-import { closeDb, getDb } from '@/server/db/client';
+import { closeDb, getDb, type Transaction } from '@/server/db/client';
 import { getCommittedQuantities } from '@/server/db/committed-quantities';
 import { lockDailyPlans, materializeDailyPlans } from '@/server/db/lock-daily-plans';
 import * as schema from '@/server/db/schema';
@@ -17,6 +17,7 @@ import {
 } from '@/server/db/schema';
 import { getCommittedQuantity } from '@/server/domain/availability';
 import {
+    IdempotencyConflictError,
     InsufficientCapacityError,
     PickupDateUnavailableError,
     PlanBelowCommitmentsError,
@@ -93,26 +94,17 @@ const waitUntilBlocked = async (holderPid: number, expected: number): Promise<vo
 };
 
 /**
- * Locks the plans in a transaction on the observer pool and keeps them locked until
+ * Takes locks with `lock` in a transaction on the observer pool and keeps them until
  * `release()`, so competing writers can be queued behind it in a known order.
- *
- * With `planExists: false` the holder creates the plans itself and keeps them uncommitted,
- * so competitors block on the first-write insert instead. They then wake together in any
- * order, so only the outcome counts are deterministic, not which competitor wins.
  */
-const holdPlanLocks = async (productIds: string[], { planExists = true } = {}) => {
-    if (planExists) {
-        // Committed first: waiters on an uncommitted insert would wake together in any order,
-        // while `FOR UPDATE` waiters queue for the row lock in arrival order.
-        await getDb().transaction((tx) => materializeDailyPlans(tx, PICKUP_DATE, productIds));
-    }
+const holdLocks = async (lock: (tx: Transaction) => Promise<unknown>) => {
     let release = () => {};
     const released = new Promise<void>((resolve) => (release = resolve));
     let signalLocked: (pid: number) => void = () => {};
     const locked = new Promise<number>((resolve) => (signalLocked = resolve));
 
     const holder = observerDb.transaction(async (tx) => {
-        await lockDailyPlans(tx, PICKUP_DATE, productIds);
+        await lock(tx);
         const result = await tx.execute<{ pid: number }>(sql`select pg_backend_pid() as pid`);
         signalLocked(result.rows[0].pid);
         await released;
@@ -138,6 +130,36 @@ const holdPlanLocks = async (productIds: string[], { planExists = true } = {}) =
             await holder;
         },
     };
+};
+
+/**
+ * Holds the plan locks. With `planExists: false` the holder creates the plans itself and keeps
+ * them uncommitted, so competitors block on the first-write insert instead. They then wake
+ * together in any order, so only the outcome counts are deterministic, not which one wins.
+ */
+const holdPlanLocks = async (productIds: string[], { planExists = true } = {}) => {
+    if (planExists) {
+        // Committed first: waiters on an uncommitted insert would wake together in any order,
+        // while `FOR UPDATE` waiters queue for the row lock in arrival order.
+        await getDb().transaction((tx) => materializeDailyPlans(tx, PICKUP_DATE, productIds));
+    }
+    return holdLocks((tx) => lockDailyPlans(tx, PICKUP_DATE, productIds));
+};
+
+/**
+ * Holds the product rows `FOR UPDATE`. Plans are materialized first, so a reservation for
+ * these products gets through plan locking and its reservation insert, and then blocks on
+ * the foreign-key check of its first item insert, with its reservation row uncommitted.
+ */
+const holdProductRows = async (productIds: string[]) => {
+    await getDb().transaction((tx) => materializeDailyPlans(tx, PICKUP_DATE, productIds));
+    return holdLocks((tx) =>
+        tx
+            .select({ id: products.id })
+            .from(products)
+            .where(inArray(products.id, productIds))
+            .for('update'),
+    );
 };
 
 const readCommitted = async (productIds: string[]) => {
@@ -398,6 +420,96 @@ describe('concurrent reservations', () => {
             .from(reservationItems)
             .where(inArray(reservationItems.productId, [rolls.id, cake.id]));
         expect(stored).toHaveLength(3);
+    });
+});
+
+describe('concurrent requests with the same idempotency key', () => {
+    const readReservationsByKey = (idempotencyKey: string) =>
+        getDb()
+            .select({ id: reservations.id })
+            .from(reservations)
+            .where(eq(reservations.idempotencyKey, idempotencyKey));
+
+    it('replays the first request for a retry queued behind it, even with capacity used up', async () => {
+        const bread = await insertProduct(10);
+        const input = buildInput([{ productId: bread.id, quantity: 10 }]);
+
+        const holder = await holdPlanLocks([bread.id]);
+        const pending: Promise<CreateReservationResult>[] = [];
+        try {
+            for (const position of [1, 2]) {
+                const request = () => createReservation(input, { now: BEFORE_CUTOFF });
+                pending.push((await holder.queue(request, position)).result);
+            }
+        } finally {
+            await holder.release();
+        }
+        const [original, retry] = await Promise.all(pending);
+
+        expect(original.replayed).toBe(false);
+        expect(retry).toEqual({ ...original, replayed: true });
+        expect(await readReservationsByKey(input.idempotencyKey)).toEqual([
+            { id: original.reservationId },
+        ]);
+        expect((await readCommitted([bread.id])).get(bread.id)).toBe(10);
+    });
+
+    it('reports a conflict, not a capacity shortage, for a different payload queued behind', async () => {
+        const bread = await insertProduct(10);
+        const input = buildInput([{ productId: bread.id, quantity: 10 }]);
+        const different = { ...input, items: [{ productId: bread.id, quantity: 9 }] };
+
+        const holder = await holdPlanLocks([bread.id]);
+        let first: Promise<CreateReservationResult> | undefined;
+        let second: Promise<CreateReservationResult> | undefined;
+        try {
+            first = (await holder.queue(() => createReservation(input, { now: BEFORE_CUTOFF }), 1))
+                .result;
+            second = (
+                await holder.queue(() => createReservation(different, { now: BEFORE_CUTOFF }), 2)
+            ).result;
+        } finally {
+            await holder.release();
+        }
+
+        const original = await first;
+        await expect(second).rejects.toBeInstanceOf(IdempotencyConflictError);
+        expect(await readReservationsByKey(input.idempotencyKey)).toEqual([
+            { id: original.reservationId },
+        ]);
+        expect((await readCommitted([bread.id])).get(bread.id)).toBe(10);
+    });
+
+    it('reports a conflict when a same-key request for other products hits the unique key', async () => {
+        const [bread, roll] = await Promise.all([insertProduct(10), insertProduct(10)]);
+        const input = buildInput([{ productId: bread.id, quantity: 2 }]);
+        const other = { ...input, items: [{ productId: roll.id, quantity: 1 }] };
+
+        // The first request waits with its reservation row inserted but uncommitted. The second
+        // locks a different plan, so only the idempotency key's unique index makes it wait.
+        const holder = await holdProductRows([bread.id]);
+        let first: Promise<CreateReservationResult> | undefined;
+        let second: Promise<CreateReservationResult> | undefined;
+        try {
+            first = (await holder.queue(() => createReservation(input, { now: BEFORE_CUTOFF }), 1))
+                .result;
+            second = (await holder.queue(() => createReservation(other, { now: BEFORE_CUTOFF }), 2))
+                .result;
+        } finally {
+            await holder.release();
+        }
+
+        const original = await first;
+        await expect(second).rejects.toBeInstanceOf(IdempotencyConflictError);
+        expect(await readReservationsByKey(input.idempotencyKey)).toEqual([
+            { id: original.reservationId },
+        ]);
+        expect(await readCommitted([bread.id, roll.id])).toEqual(
+            new Map([
+                [bread.id, 2],
+                [roll.id, 0],
+            ]),
+        );
     });
 });
 
