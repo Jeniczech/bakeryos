@@ -292,10 +292,10 @@ describe('POST /api/reservations', () => {
     it('returns 422 when the online quantity limit is exceeded', async () => {
         const product = await insertProduct(100);
 
-        const response = await postJson(reservationBody(product.id, 21));
+        const response = await postJson(reservationBody(product.id, 11));
 
         expect(response.status).toBe(422);
-        expect(await response.json()).toMatchObject({ code: 'PRODUCT_LIMIT_EXCEEDED', limit: 20 });
+        expect(await response.json()).toMatchObject({ code: 'PRODUCT_LIMIT_EXCEEDED', limit: 10 });
     });
 
     it.each([

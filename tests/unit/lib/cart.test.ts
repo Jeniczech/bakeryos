@@ -60,23 +60,23 @@ describe('cartReducer', () => {
     });
 
     it('refuses increases beyond the displayed availability', () => {
-        expect(quantities(fill([], bread))).toEqual([['bread', 10]]);
+        expect(quantities(fill([], { ...bread, availableQuantity: 6 }))).toEqual([['bread', 6]]);
         expect(setQuantity([], { ...bread, availableQuantity: 0 }, 1)).toEqual([]);
     });
 
-    it('refuses increases beyond 20 units per product', () => {
-        expect(quantities(fill([], roll))).toEqual([['roll', 20]]);
+    it('refuses increases beyond 10 units per product', () => {
+        expect(quantities(fill([], roll))).toEqual([['roll', 10]]);
     });
 
-    it('refuses increases beyond 50 units per reservation', () => {
-        let cart: Cart = [];
-        for (const productId of ['a', 'b', 'c']) {
+    it('refuses increases beyond 20 units per reservation', () => {
+        let cart = setQuantity([], { ...roll, productId: 'a' }, 6);
+        for (const productId of ['b', 'c', 'd']) {
             cart = fill(cart, { ...roll, productId });
         }
         expect(quantities(cart)).toEqual([
-            ['a', 20],
-            ['b', 20],
-            ['c', 10],
+            ['a', 6],
+            ['b', 10],
+            ['c', 4],
         ]);
     });
 

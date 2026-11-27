@@ -316,20 +316,20 @@ describe('createReservation', () => {
             const bun = await insertProduct({ defaultCapacity: 100 });
 
             await expect(
-                createReservation(buildInput([{ productId: bread.id, quantity: 21 }]), {
+                createReservation(buildInput([{ productId: bread.id, quantity: 11 }]), {
                     now: BEFORE_CUTOFF,
                 }),
             ).rejects.toMatchObject({
                 code: 'PRODUCT_LIMIT_EXCEEDED',
                 productId: bread.id,
-                requested: 21,
+                requested: 11,
             });
             await expect(
                 createReservation(
                     buildInput([
-                        { productId: bread.id, quantity: 20 },
-                        { productId: roll.id, quantity: 20 },
-                        { productId: bun.id, quantity: 11 },
+                        { productId: bread.id, quantity: 10 },
+                        { productId: roll.id, quantity: 10 },
+                        { productId: bun.id, quantity: 1 },
                     ]),
                     { now: BEFORE_CUTOFF },
                 ),
