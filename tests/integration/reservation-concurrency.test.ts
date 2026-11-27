@@ -254,6 +254,9 @@ describe('concurrent reservations', () => {
         expect(fulfilled).toHaveLength(1);
         expect(rejected).toHaveLength(1);
         expect(rejected[0]).toBeInstanceOf(InsufficientCapacityError);
+        expect((rejected[0] as InsufficientCapacityError).shortages).toEqual([
+            { productId: bread.id, requested: 1, available: 0 },
+        ]);
 
         const plans = await getDb()
             .select()
@@ -344,10 +347,10 @@ describe('concurrent reservations', () => {
     });
 
     it('takes nothing from a shared product when an overlapping cart is short elsewhere', async () => {
-        // Rolls sort first, so every cart queues on the rolls row in order and the cake shortage
-        // is found on the second item, after the second cart has claimed a roll.
+        // Rolls sort first (PostgreSQL orders UUIDs like lowercase hex strings), so every cart
+        // queues on the rolls row in order and the second cart is short only on cake.
         const [rolls, cake] = (await Promise.all([insertProduct(2), insertProduct(2)])).sort(
-            (left, right) => left.id.localeCompare(right.id),
+            (left, right) => (left.id < right.id ? -1 : 1),
         );
         const carts = [
             [
@@ -380,11 +383,9 @@ describe('concurrent reservations', () => {
             return;
         }
         expect(second.reason).toBeInstanceOf(InsufficientCapacityError);
-        expect((second.reason as InsufficientCapacityError).shortages).toContainEqual({
-            productId: cake.id,
-            requested: 1,
-            available: 0,
-        });
+        expect((second.reason as InsufficientCapacityError).shortages).toEqual([
+            { productId: cake.id, requested: 1, available: 0 },
+        ]);
 
         expect(await readCommitted([rolls.id, cake.id])).toEqual(
             new Map([
