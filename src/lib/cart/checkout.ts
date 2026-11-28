@@ -114,6 +114,25 @@ export const describeSubmitFailure = (
     };
 };
 
+/**
+ * Whether a failed submission's notice still applies. After a capacity or availability failure
+ * the refreshed cart flags the lines to change itself, so that notice is shown only while the
+ * cart flags nothing and still holds the items that were sent.
+ */
+export const isSubmitFailureShown = (
+    failure: { kind: SubmitFailureKind; items: ReservationPayload['items'] },
+    cart: Cart,
+    flaggedLines: number,
+): boolean => {
+    if (failure.kind !== 'CAPACITY' && failure.kind !== 'UNAVAILABLE') {
+        return true;
+    }
+    const cartItems = normalizeItems(
+        cart.map(({ productId, quantity }) => ({ productId, quantity })),
+    );
+    return flaggedLines === 0 && JSON.stringify(cartItems) === JSON.stringify(failure.items);
+};
+
 /** Whole minutes from a `Retry-After` header in seconds, at least 1. */
 export const parseRetryAfterMinutes = (header: string | null): number => {
     const seconds = Number(header);

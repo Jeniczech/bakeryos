@@ -1,8 +1,8 @@
 'use client';
 
 import { Notice } from '@/components/ui/notice';
-import { canSubmitCart, reviewCart } from '@/lib/cart/cart';
-import { buildReservationPayload } from '@/lib/cart/checkout';
+import { canSubmitCart, countFlaggedLines, reviewCart } from '@/lib/cart/cart';
+import { buildReservationPayload, isSubmitFailureShown } from '@/lib/cart/checkout';
 import { validateCustomerDetails } from '@/lib/cart/customer-details';
 import { useCart } from './cart-provider';
 import type { CartCatalog } from './cart-summary';
@@ -10,7 +10,7 @@ import { useCheckout, type SubmitFailure } from './checkout-provider';
 import { useCustomer } from './customer-provider';
 
 const FAILURE_MESSAGES: Record<SubmitFailure['kind'], (failure: SubmitFailure) => string> = {
-    CAPACITY: () => 'Některé pečivo mezitím došlo. Upravte prosím množství označená v košíku.',
+    CAPACITY: () => 'Některé pečivo mezitím došlo. Zkontrolujte prosím košík a zkuste to znovu.',
     UNAVAILABLE: () => 'Některé pečivo už na tento den nelze rezervovat. Upravte prosím košík.',
     DATE_CLOSED: () => 'Na vybraný den už rezervace nepřijímáme. Vyberte prosím jiný den.',
     RATE_LIMITED: ({ retryAfterMinutes }) =>
@@ -53,10 +53,8 @@ export const CheckoutButton = ({
     if (cart.length === 0) {
         return null;
     }
-    const canSubmit =
-        pickupDate !== null &&
-        catalog.status === 'open' &&
-        canSubmitCart(reviewCart(cart, catalog.products));
+    const review = catalog.status === 'open' ? reviewCart(cart, catalog.products) : null;
+    const canSubmit = pickupDate !== null && review !== null && canSubmitCart(review);
     const customerErrors = validateCustomerDetails(customer);
     const hasCustomerErrors = customerErrors.name !== null || customerErrors.phone !== null;
 
@@ -73,7 +71,11 @@ export const CheckoutButton = ({
     };
 
     const hint = getDisabledHint(catalog, canSubmit);
-    const currentFailure = failure?.pickupDate === pickupDate ? failure : null;
+    const currentFailure =
+        failure?.pickupDate === pickupDate &&
+        isSubmitFailureShown(failure, cart, review ? countFlaggedLines(review.lines) : 0)
+            ? failure
+            : null;
     return (
         <div className="flex flex-col gap-3">
             <button
