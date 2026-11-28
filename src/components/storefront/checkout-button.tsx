@@ -73,7 +73,11 @@ export const CheckoutButton = ({
     const hint = getDisabledHint(catalog, canSubmit);
     const currentFailure =
         failure?.pickupDate === pickupDate &&
-        isSubmitFailureShown(failure, cart, review ? countFlaggedLines(review.lines) : 0)
+        isSubmitFailureShown(failure, {
+            cart,
+            flaggedLines: review ? countFlaggedLines(review.lines) : 0,
+            dateClosed: catalog.status === 'closed',
+        })
             ? failure
             : null;
     return (

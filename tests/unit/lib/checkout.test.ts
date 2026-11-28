@@ -115,25 +115,38 @@ describe('isSubmitFailureShown', () => {
         { name: 'Jana', phone: '777123456' },
         cart,
     ).items;
+    const view = { cart, flaggedLines: 0, dateClosed: false };
 
     it('leaves a capacity or availability failure to the cart once it flags lines', () => {
-        expect(isSubmitFailureShown({ kind: 'CAPACITY', items: sent }, cart, 1)).toBe(false);
-        expect(isSubmitFailureShown({ kind: 'UNAVAILABLE', items: sent }, cart, 1)).toBe(false);
+        const flagged = { ...view, flaggedLines: 1 };
+        expect(isSubmitFailureShown({ kind: 'CAPACITY', items: sent }, flagged)).toBe(false);
+        expect(isSubmitFailureShown({ kind: 'UNAVAILABLE', items: sent }, flagged)).toBe(false);
     });
 
     it('hides a capacity failure once the cart is edited', () => {
         const edited = [cart[0]!, { ...cart[1]!, quantity: 3 }];
-        expect(isSubmitFailureShown({ kind: 'CAPACITY', items: sent }, edited, 0)).toBe(false);
+        expect(
+            isSubmitFailureShown({ kind: 'CAPACITY', items: sent }, { ...view, cart: edited }),
+        ).toBe(false);
     });
 
     it('shows a capacity failure while the unchanged cart flags nothing', () => {
         const reordered = [cart[1]!, cart[0]!];
-        expect(isSubmitFailureShown({ kind: 'CAPACITY', items: sent }, reordered, 0)).toBe(true);
+        expect(
+            isSubmitFailureShown({ kind: 'CAPACITY', items: sent }, { ...view, cart: reordered }),
+        ).toBe(true);
+    });
+
+    it('leaves a passed deadline to the cart once it reports the date closed', () => {
+        const failure = { kind: 'DATE_CLOSED', items: sent } as const;
+        expect(isSubmitFailureShown(failure, { ...view, dateClosed: true })).toBe(false);
+        expect(isSubmitFailureShown(failure, view)).toBe(true);
     });
 
     it('always shows failures the cart does not explain', () => {
-        for (const kind of ['DATE_CLOSED', 'RATE_LIMITED', 'RETRY'] as const) {
-            expect(isSubmitFailureShown({ kind, items: sent }, [], 2)).toBe(true);
+        const busy = { cart: [], flaggedLines: 2, dateClosed: true };
+        for (const kind of ['RATE_LIMITED', 'RETRY'] as const) {
+            expect(isSubmitFailureShown({ kind, items: sent }, busy)).toBe(true);
         }
     });
 });
