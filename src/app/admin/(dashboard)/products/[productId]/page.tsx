@@ -25,7 +25,6 @@ const EditProductContent = async ({ params }: { params: Params }) => {
                 values: {
                     name: product.name,
                     description: product.description ?? '',
-                    imageUrl: product.imageUrl ?? '',
                     price: formatCrownsInput(product.price),
                     defaultCapacity: String(product.defaultCapacity),
                     defaultWalkInQuantity: String(product.defaultWalkInQuantity),

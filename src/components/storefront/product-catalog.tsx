@@ -1,5 +1,4 @@
 import { cacheLife, cacheTag } from 'next/cache';
-import Image from 'next/image';
 import { Suspense } from 'react';
 import { Notice } from '@/components/ui/notice';
 import { formatLongDateAccusative, formatPragueDateTime } from '@/lib/formatting/dates';
@@ -63,19 +62,6 @@ export const ProductCatalog = async ({ pickupDate }: { pickupDate: string }) => 
                             key={product.id}
                             className="flex flex-col overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm"
                         >
-                            {product.imageUrl && (
-                                <div className="relative aspect-[4/3] bg-amber-100">
-                                    {/* Admin-entered URLs can point anywhere, so skip the optimizer's host allowlist. */}
-                                    <Image
-                                        src={product.imageUrl}
-                                        alt=""
-                                        fill
-                                        unoptimized
-                                        sizes="(min-width: 640px) 50vw, 100vw"
-                                        className="object-cover"
-                                    />
-                                </div>
-                            )}
                             <div className="flex flex-1 flex-col gap-1 p-4">
                                 <h3 className="font-semibold text-amber-950">{product.name}</h3>
                                 {product.description && (

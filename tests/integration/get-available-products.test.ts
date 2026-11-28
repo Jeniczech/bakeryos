@@ -102,7 +102,6 @@ describe('getAvailableProducts', () => {
         const product = await insertProduct({
             name: 'Catalog rye',
             description: 'Dark rye',
-            imageUrl: '/rye.jpg',
             price: 6500,
             defaultCapacity: 8,
             defaultWalkInQuantity: 3,
@@ -117,7 +116,6 @@ describe('getAvailableProducts', () => {
                 id: product.id,
                 name: 'Catalog rye',
                 description: 'Dark rye',
-                imageUrl: '/rye.jpg',
                 price: 6500,
                 remainingQuantity: 5,
             },
@@ -284,7 +282,6 @@ describe('getOfferedProducts', () => {
                 id: wednesday.id,
                 name: 'Catalog rye',
                 description: 'Dark rye',
-                imageUrl: null,
                 price: 6500,
             },
         ]);

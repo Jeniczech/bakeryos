@@ -9,6 +9,7 @@ import {
     type ProductFormValues,
 } from '@/app/admin/(dashboard)/products/actions';
 import { pragueTimeToInstant } from '@/lib/date-time/prague';
+import { PRODUCT_DESCRIPTION_MAX_LENGTH } from '@/lib/validation/product';
 import { closeDb, getDb } from '@/server/db/client';
 import {
     bakeryOpeningDays,
@@ -50,7 +51,6 @@ const INITIAL_STATE: ProductFormState = {
     values: {
         name: '',
         description: '',
-        imageUrl: '',
         price: '',
         defaultCapacity: '',
         defaultWalkInQuantity: '',
@@ -61,7 +61,6 @@ const INITIAL_STATE: ProductFormState = {
 const validValues = (overrides: Partial<ProductFormValues> = {}): ProductFormValues => ({
     name: `${TEST_PRODUCT_PREFIX} rye`,
     description: 'Sourdough rye',
-    imageUrl: 'https://example.com/rye.jpg',
     price: '45,50',
     defaultCapacity: '40',
     defaultWalkInQuantity: '5',
@@ -190,7 +189,6 @@ describe('createProductAction', () => {
             expect.objectContaining({
                 name: `${TEST_PRODUCT_PREFIX} rye`,
                 description: 'Sourdough rye',
-                imageUrl: 'https://example.com/rye.jpg',
                 price: 4550,
                 defaultCapacity: 40,
                 defaultWalkInQuantity: 5,
@@ -205,12 +203,12 @@ describe('createProductAction', () => {
             price: '12,345',
             defaultCapacity: '3',
             defaultWalkInQuantity: '4',
-            imageUrl: 'javascript:alert(1)',
+            description: 'x'.repeat(PRODUCT_DESCRIPTION_MAX_LENGTH + 1),
         });
 
         await expect(createProductAction(INITIAL_STATE, toFormData(values))).resolves.toEqual({
             error: 'INVALID_REQUEST',
-            fields: ['imageUrl', 'price', 'defaultWalkInQuantity'],
+            fields: ['description', 'price', 'defaultWalkInQuantity'],
             values,
         });
         expect(await readTestProducts()).toEqual([]);
@@ -252,14 +250,14 @@ describe('updateProductAction', () => {
         await expectRedirectTo(
             updateProductAction(
                 INITIAL_STATE,
-                toFormData(validValues({ active: false, imageUrl: '' }), product),
+                toFormData(validValues({ active: false, description: '' }), product),
             ),
             '/admin/products',
         );
 
         expect(await readProduct(product.id)).toMatchObject({
             name: `${TEST_PRODUCT_PREFIX} rye`,
-            imageUrl: null,
+            description: null,
             price: 4550,
             active: false,
         });
@@ -426,7 +424,7 @@ describe('updateProduct and existing reservations', () => {
         await expect(
             updateProduct(
                 product.id,
-                { ...product, defaultCapacity: 99, description: null, imageUrl: null },
+                { ...product, defaultCapacity: 99, description: null },
                 'abc',
             ),
         ).rejects.toBeInstanceOf(InvalidRequestError);

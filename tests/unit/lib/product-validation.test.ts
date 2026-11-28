@@ -4,7 +4,6 @@ import { parseCrownsToHalere, productInputSchema } from '@/lib/validation/produc
 const validProduct = {
     name: '  Rye bread ',
     description: '  ',
-    imageUrl: '',
     price: 4550,
     defaultCapacity: 40,
     defaultWalkInQuantity: 10,
@@ -39,26 +38,14 @@ describe('productInputSchema', () => {
             ...validProduct,
             name: 'Rye bread',
             description: null,
-            imageUrl: null,
         });
     });
 
-    it('accepts missing optional fields and an https image URL', () => {
-        expect(
-            productInputSchema.parse({
-                ...validProduct,
-                description: undefined,
-                imageUrl: ' https://example.com/rye.jpg ',
-            }),
-        ).toMatchObject({ description: null, imageUrl: 'https://example.com/rye.jpg' });
+    it('accepts a missing description', () => {
+        expect(productInputSchema.parse({ ...validProduct, description: undefined })).toMatchObject(
+            { description: null },
+        );
     });
-
-    it.each(['javascript:alert(1)', 'ftp://example.com/a.jpg', 'not a url'])(
-        'rejects the image URL %j',
-        (imageUrl) => {
-            expect(issuePaths({ ...validProduct, imageUrl })).toEqual(['imageUrl']);
-        },
-    );
 
     it('rejects a blank name', () => {
         expect(issuePaths({ ...validProduct, name: '   ' })).toEqual(['name']);

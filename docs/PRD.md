@@ -50,7 +50,7 @@ Payment occurs at pickup. There are no customer accounts, emails, or SMS notific
 
 ### 4.2 Catalog and cart
 
-- Show product name, optional description and image, current price, and remaining reservable quantity.
+- Show product name, optional description, current price, and remaining reservable quantity.
 - Support multiple products and positive integer quantities per reservation.
 - Online reservations are limited to **10 units per product** and **20 units per reservation**. Larger orders are placed by phone.
 - Do not allow a customer to knowingly add more than the displayed available quantity.
@@ -78,7 +78,7 @@ Payment occurs at pickup. There are no customer accounts, emails, or SMS notific
 ### 5.2 Products
 
 - Create, update, and deactivate products.
-- Product fields: name, optional description, optional image, price, active flag, default daily maximum capacity, default planned walk-in quantity.
+- Product fields: name, optional description, price, active flag, default daily maximum capacity, default planned walk-in quantity.
 - Product production weekdays can be seeded/configured; an admin editor is deferred.
 - Deactivation prevents new reservations but does not alter historical reservations.
 - Changing price/name does not alter already-confirmed reservation line items.
@@ -186,7 +186,6 @@ The interface should be mobile-friendly, accessible, simple, and visually warm, 
 - Admin UI for opening hours, closures, and product weekdays.
 - Print-friendly production sheet.
 - Advanced filters, search, and analytics.
-- More polished image upload and media management.
 
 ### Out of scope
 

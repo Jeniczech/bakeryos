@@ -149,7 +149,6 @@ Seed one admin account; no registration or password reset.
 | `id` | UUID | PK |
 | `name` | TEXT | Required; unique on `lower(name)`, inactive products included; violation → `ProductNameTakenError` |
 | `description` | TEXT | Nullable |
-| `image_url` | TEXT | Nullable |
 | `price` | INTEGER | `>= 0`, haléře |
 | `active` | BOOLEAN | Default true |
 | `default_capacity` | INTEGER | `>= 0` |
@@ -522,11 +521,11 @@ Flow: pickup date → eligible catalog → cart → name/phone → confirmation 
 Caching only speeds up what the storefront displays; it never affects reservation or capacity checks, which always read the database inside the transaction.
 
 - **URLs:** `/` asks for a pickup date; each date is a path segment, `/den/YYYY-MM-DD`. A path segment (not `?date=`) is required for instant switching: Next 16 reuses the page segment when only search params change and then waits for the server instead of rendering the `<Link prefetch>` payload.
-- **Cached:** the products offered on a date (name, description, image), via `'use cache'` with `cacheLife('minutes')` and tag `catalog`. They do not depend on the current time. Date links use `prefetch`, so switching dates renders from the prefetched cache without a server round trip.
+- **Cached:** the products offered on a date (name, description), via `'use cache'` with `cacheLife('minutes')` and tag `catalog`. They do not depend on the current time. Date links use `prefetch`, so switching dates renders from the prefetched cache without a server round trip.
 - **Never cached:** anything that depends on the current time or on reservations — the pickup-date list (booking window, cutoff), the selected date's bookability, and remaining availability — and product prices, so the catalog and cart never show a price that differs from the one charged. These render per request behind `<Suspense>` after `connection()`; each product card streams its price and remaining quantity into a slot of the cached card, from one per-request query set shared by all cards and the cart summary, so the cart never shows a price or availability other than the one displayed. If that load fails, only the slots show an error.
 - The catalog renders only for dates in a cached list of bookable dates (5-minute expiry), which keeps it prefetchable and bounds its cache; the uncached status warning and the reservation transaction remain authoritative.
 - The pickup-date picker lives in a layout shared by `/` and `/den/[date]`, so the date list loads once per visit.
-- Admin mutations to products, product weekdays, opening days, or closures must invalidate the `catalog` tag. Until they do, displayed names, descriptions and images may be stale for minutes, and a withdrawn product's card says it can no longer be reserved.
+- Admin mutations to products, product weekdays, opening days, or closures must invalidate the `catalog` tag. Until they do, displayed names and descriptions may be stale for minutes, and a withdrawn product's card says it can no longer be reserved.
 - **On Netlify** (Next.js adapter `@netlify/plugin-nextjs` 5.16.9, verified from its source on 2026-11-25), `'use cache'` entries live in an in-memory LRU cache in each function instance (1,000 entries / 50 MB). They are not shared between instances and are lost on cold starts and deploys. Once an entry's `revalidate` time passes, it is discarded and recomputed on the next request instead of being served stale. Tag invalidations are stored in Netlify Blobs and checked on every cache read, so `updateTag('catalog')` takes effect on all instances. At this app's traffic most renders start from a cold or empty cache, so the server cache saves little database work; its main purpose is making the catalog prefetchable. Browser-side, a prefetched catalog stays in the router cache for its `stale` time (5 minutes) and is not invalidated by `updateTag`. It only drives the instant first render of a date switch: the navigation request sent on the click re-renders the whole date page, catalog included, and replaces the prefetched content when it arrives (verified on production). An outdated catalog is therefore visible for at most one round trip after a click; only the date already on screen stays unchanged until the next navigation or reload.
 
 ## 11. Security and operational requirements
