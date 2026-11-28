@@ -143,6 +143,12 @@ describe('isSubmitFailureShown', () => {
         expect(isSubmitFailureShown(failure, view)).toBe(true);
     });
 
+    it('leaves a capacity or availability failure to the cart once the date closes', () => {
+        const closed = { ...view, dateClosed: true };
+        expect(isSubmitFailureShown({ kind: 'CAPACITY', items: sent }, closed)).toBe(false);
+        expect(isSubmitFailureShown({ kind: 'UNAVAILABLE', items: sent }, closed)).toBe(false);
+    });
+
     it('always shows failures the cart does not explain', () => {
         const busy = { cart: [], flaggedLines: 2, dateClosed: true };
         for (const kind of ['RATE_LIMITED', 'RETRY'] as const) {

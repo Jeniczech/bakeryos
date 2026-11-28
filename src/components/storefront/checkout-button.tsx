@@ -11,7 +11,8 @@ import { useCustomer } from './customer-provider';
 
 const FAILURE_MESSAGES: Record<SubmitFailure['kind'], (failure: SubmitFailure) => string> = {
     CAPACITY: () => 'Některé pečivo mezitím došlo. Zkontrolujte prosím košík a zkuste to znovu.',
-    UNAVAILABLE: () => 'Některé pečivo už na tento den nelze rezervovat. Upravte prosím košík.',
+    UNAVAILABLE: () =>
+        'Některé pečivo už na tento den nelze rezervovat. Zkontrolujte prosím košík a zkuste to znovu.',
     DATE_CLOSED: () => 'Na vybraný den už rezervace nepřijímáme. Vyberte prosím jiný den.',
     RATE_LIMITED: ({ retryAfterMinutes }) =>
         `Příliš mnoho pokusů o rezervaci. Zkuste to prosím znovu za ${retryAfterMinutes} min.`,

@@ -115,7 +115,7 @@ export const describeSubmitFailure = (
 };
 
 /** What the cart beside the checkout button currently tells the customer. */
-export type CartView = {
+type CartView = {
     cart: Cart;
     flaggedLines: number;
     /** The selected date no longer takes reservations; the cart says so instead of a total. */
@@ -124,19 +124,19 @@ export type CartView = {
 
 /**
  * Whether a failed submission's notice still applies, or the refreshed cart already explains it.
- * After a passed deadline the cart reports the date as closed. After a capacity or availability
- * failure it flags the lines to change, so that notice is shown only while the cart flags
- * nothing and still holds the items that were sent.
+ * Once the date has closed, the cart's closed-date notice replaces every date-related failure.
+ * Otherwise a capacity or availability failure is shown only while the cart flags nothing and
+ * still holds the items that were sent, since flagged lines already say what to change.
  */
 export const isSubmitFailureShown = (
     failure: { kind: SubmitFailureKind; items: ReservationPayload['items'] },
     { cart, flaggedLines, dateClosed }: CartView,
 ): boolean => {
-    if (failure.kind === 'DATE_CLOSED') {
-        return !dateClosed;
-    }
     if (failure.kind !== 'CAPACITY' && failure.kind !== 'UNAVAILABLE') {
-        return true;
+        return failure.kind !== 'DATE_CLOSED' || !dateClosed;
+    }
+    if (dateClosed) {
+        return false;
     }
     const cartItems = normalizeItems(
         cart.map(({ productId, quantity }) => ({ productId, quantity })),
