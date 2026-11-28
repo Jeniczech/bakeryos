@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { pragueTimeToInstant } from '@/lib/date-time/prague';
 import { closeDb, getDb } from '@/server/db/client';
 import {
+    bakeryClosures,
     bakeryOpeningDays,
     dailyProductPlans,
     productWeekdays,
@@ -24,7 +25,8 @@ import { uniqueProductName } from '../support/unique-name';
 const PICKUP_DATE = '2099-10-14'; // Wednesday
 const WEDNESDAY = 3;
 const MONDAY = 1;
-const CLOSED_MONDAY = '2099-10-19';
+// A closure, not a closed weekday: test files share the database, and others may open any weekday.
+const CLOSED_DATE = '2099-10-18'; // Sunday, unused by other test files
 const BEFORE_CUTOFF = pragueTimeToInstant('2099-10-13', 12);
 const CUTOFF = pragueTimeToInstant('2099-10-13', 18);
 
@@ -66,6 +68,7 @@ beforeAll(async () => {
         .insert(bakeryOpeningDays)
         .values({ weekday: WEDNESDAY, isOpen: true })
         .onConflictDoNothing();
+    await getDb().insert(bakeryClosures).values({ date: CLOSED_DATE }).onConflictDoNothing();
 });
 
 afterEach(async () => {
@@ -90,6 +93,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+    await getDb().delete(bakeryClosures).where(eq(bakeryClosures.date, CLOSED_DATE));
     await closeDb();
 });
 
@@ -168,7 +172,7 @@ describe('getAvailableProducts', () => {
     it.each([
         ['an invalid date', '2099-02-30', BEFORE_CUTOFF, 'INVALID_DATE'],
         ['a date after the ordering cutoff', PICKUP_DATE, CUTOFF, 'CUTOFF_PASSED'],
-        ['a closed day', CLOSED_MONDAY, BEFORE_CUTOFF, 'BAKERY_CLOSED'],
+        ['a closed day', CLOSED_DATE, BEFORE_CUTOFF, 'BAKERY_CLOSED'],
         ['a date beyond the booking window', '2099-10-25', BEFORE_CUTOFF, 'OUTSIDE_BOOKING_WINDOW'],
     ])('rejects %s', async (_label, date, now, code) => {
         const attempt = getAvailableProducts(date, { now });
@@ -288,7 +292,7 @@ describe('getOfferedProducts', () => {
 
     it.each([
         ['an invalid date', '2099-02-30'],
-        ['a closed day', CLOSED_MONDAY],
+        ['a closed day', CLOSED_DATE],
     ])('returns null for %s', async (_label, date) => {
         await insertProduct();
 

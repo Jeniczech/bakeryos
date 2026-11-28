@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { pragueTimeToInstant } from '@/lib/date-time/prague';
 import { closeDb, getDb } from '@/server/db/client';
 import {
+    bakeryClosures,
     bakeryOpeningDays,
     dailyProductPlans,
     productWeekdays,
@@ -32,7 +33,8 @@ import { uniqueProductName } from '../support/unique-name';
 // Far outside any real booking window; the clock is injected relative to these dates.
 const PICKUP_DATE = '2099-05-13'; // Wednesday
 const WEDNESDAY = 3;
-const CLOSED_MONDAY = '2099-05-11';
+// A closure, not a closed weekday: test files share the database, and others may open any weekday.
+const CLOSED_DATE = '2099-05-15'; // Friday, unused by other test files
 const BEFORE_CUTOFF = pragueTimeToInstant('2099-05-12', 12);
 const CUTOFF = pragueTimeToInstant('2099-05-12', 18);
 
@@ -96,6 +98,7 @@ beforeAll(async () => {
         .insert(bakeryOpeningDays)
         .values({ weekday: WEDNESDAY, isOpen: true })
         .onConflictDoNothing();
+    await getDb().insert(bakeryClosures).values({ date: CLOSED_DATE }).onConflictDoNothing();
 });
 
 afterEach(async () => {
@@ -115,6 +118,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+    await getDb().delete(bakeryClosures).where(eq(bakeryClosures.date, CLOSED_DATE));
     await closeDb();
 });
 
@@ -303,7 +307,7 @@ describe('createReservation', () => {
             await expect(
                 createReservation(
                     buildInput([{ productId: bread.id, quantity: 1 }], {
-                        pickupDate: CLOSED_MONDAY,
+                        pickupDate: CLOSED_DATE,
                     }),
                     { now: pragueTimeToInstant('2099-05-09', 12) },
                 ),
