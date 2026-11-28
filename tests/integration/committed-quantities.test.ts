@@ -7,6 +7,7 @@ import { lockDailyPlans } from '@/server/db/lock-daily-plans';
 import { dailyProductPlans, products, reservationItems, reservations } from '@/server/db/schema';
 import type { CommittedQuantities } from '@/server/domain/availability';
 import type { ReservationStatus } from '@/server/domain/reservation-rules';
+import { uniqueProductName } from '../support/unique-name';
 
 // Far outside any booking window, so tests never collide with seeded or demo data.
 const DATE = '2099-04-14';
@@ -18,7 +19,11 @@ const createdReservationIds: string[] = [];
 const insertProduct = async () => {
     const [product] = await getDb()
         .insert(products)
-        .values({ name: 'Aggregation test loaf', price: 5000, defaultCapacity: 50 })
+        .values({
+            name: uniqueProductName('Aggregation test loaf'),
+            price: 5000,
+            defaultCapacity: 50,
+        })
         .returning();
     createdProductIds.push(product.id);
     return product;

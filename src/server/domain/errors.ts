@@ -134,6 +134,15 @@ export class ProductChangedError extends DomainError {
     }
 }
 
+/** Another product already has this name, compared case-insensitively. */
+export class ProductNameTakenError extends DomainError {
+    readonly code = 'PRODUCT_NAME_TAKEN';
+
+    constructor(readonly name: string) {
+        super('Another product already has this name.');
+    }
+}
+
 /** Also used for malformed or unknown management tokens, so a response never reveals which. */
 export class ReservationNotFoundError extends DomainError {
     readonly code = 'RESERVATION_NOT_FOUND';

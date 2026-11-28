@@ -147,7 +147,7 @@ Seed one admin account; no registration or password reset.
 | Column | Type | Rules |
 |---|---|---|
 | `id` | UUID | PK |
-| `name` | TEXT | Required |
+| `name` | TEXT | Required; unique on `lower(name)`, inactive products included; violation → `ProductNameTakenError` |
 | `description` | TEXT | Nullable |
 | `image_url` | TEXT | Nullable |
 | `price` | INTEGER | `>= 0`, haléře |

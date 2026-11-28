@@ -216,6 +216,19 @@ describe('createProductAction', () => {
         expect(await readTestProducts()).toEqual([]);
         expect(updateTag).not.toHaveBeenCalled();
     });
+
+    it('rejects a name another product has, ignoring case, even when that one is inactive', async () => {
+        const existing = await insertProduct({ active: false });
+        const values = validValues({ name: ` ${TEST_PRODUCT_PREFIX} LOAF ` });
+
+        await expect(createProductAction(INITIAL_STATE, toFormData(values))).resolves.toEqual({
+            error: 'NAME_TAKEN',
+            fields: ['name'],
+            values,
+        });
+        expect((await readTestProducts()).map((row) => row.id)).toEqual([existing.id]);
+        expect(updateTag).not.toHaveBeenCalled();
+    });
 });
 
 describe('updateProductAction', () => {
@@ -284,6 +297,29 @@ describe('updateProductAction', () => {
             defaultCapacity: 40,
         });
         expect(updateTag).not.toHaveBeenCalled();
+    });
+
+    it('rejects a rename to the name of another product without writing', async () => {
+        await insertProduct({ name: `${TEST_PRODUCT_PREFIX} other` });
+        const product = await insertProduct();
+        const values = validValues({ name: `${TEST_PRODUCT_PREFIX} OTHER` });
+
+        await expect(
+            updateProductAction(INITIAL_STATE, toFormData(values, product)),
+        ).resolves.toEqual({ error: 'NAME_TAKEN', fields: ['name'], values });
+        expect(await readProduct(product.id)).toMatchObject({ name: product.name });
+        expect(updateTag).not.toHaveBeenCalled();
+    });
+
+    it('lets a product change the letter case of its own name', async () => {
+        const product = await insertProduct();
+        const name = `${TEST_PRODUCT_PREFIX} LOAF`;
+
+        await expectRedirectTo(
+            updateProductAction(INITIAL_STATE, toFormData(validValues({ name }), product)),
+            '/admin/products',
+        );
+        expect(await readProduct(product.id)).toMatchObject({ name });
     });
 });
 

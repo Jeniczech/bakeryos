@@ -22,6 +22,7 @@ import { getDailyProduction } from '@/server/services/production/get-daily-produ
 import { updateDailyPlan } from '@/server/services/production/update-daily-plan';
 import { cancelReservation } from '@/server/services/reservations/cancel-reservation';
 import { createReservation } from '@/server/services/reservations/create-reservation';
+import { uniqueProductName } from '../support/unique-name';
 
 const session = vi.hoisted(() => ({
     current: null as { user: { id: string; email: string } } | null,
@@ -46,7 +47,7 @@ const insertProduct = async (overrides: Partial<typeof products.$inferInsert> = 
     const [product] = await getDb()
         .insert(products)
         .values({
-            name: 'Production test loaf',
+            name: uniqueProductName('Production test loaf'),
             price: 4000,
             defaultCapacity: 20,
             defaultWalkInQuantity: 5,
@@ -116,7 +117,7 @@ afterAll(async () => {
 describe('getDailyProduction', () => {
     it('applies product defaults when no daily plan exists, without creating one', async () => {
         const bread = await insertProduct({
-            name: 'Rye',
+            name: 'Production rye',
             defaultCapacity: 12,
             defaultWalkInQuantity: 4,
         });
@@ -126,7 +127,7 @@ describe('getDailyProduction', () => {
         expect(production.dateLock).toBeNull();
         expect(findRow(production.rows, bread.id)).toEqual({
             productId: bread.id,
-            productName: 'Rye',
+            productName: 'Production rye',
             capacity: 12,
             activeReserved: 0,
             retainedCancelled: 0,

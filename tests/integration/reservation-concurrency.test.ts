@@ -30,6 +30,7 @@ import {
     type CreateReservationInput,
     type CreateReservationResult,
 } from '@/server/services/reservations/create-reservation';
+import { uniqueProductName } from '../support/unique-name';
 
 // Far outside any real booking window; the clock is injected relative to this date.
 const PICKUP_DATE = '2099-07-15'; // Wednesday
@@ -51,7 +52,7 @@ const createdProductIds: string[] = [];
 const insertProduct = async (defaultCapacity: number) => {
     const [product] = await getDb()
         .insert(products)
-        .values({ name: 'Concurrency test loaf', price: 4500, defaultCapacity })
+        .values({ name: uniqueProductName('Concurrency test loaf'), price: 4500, defaultCapacity })
         .returning();
     createdProductIds.push(product.id);
     return product;
