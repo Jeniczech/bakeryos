@@ -26,11 +26,10 @@ export const LimitHint = ({ limit }: { limit: QuantityLimit }) => (
 /**
  * Replaces the limit hint while the cart holds more units than are left, for example after
  * someone else reserved them, so the card says the quantity has to go down, as the cart does.
+ * The availability line above already says how many are left.
  */
 export const OverAvailabilityHint = ({ availableQuantity }: { availableQuantity: number }) => (
     <p className="line-clamp-2 min-w-0 flex-1 text-xs leading-tight text-orange-800">
-        {availableQuantity === 0
-            ? 'Vyprodáno, odeberte z košíku.'
-            : `Zbývá jen ${availableQuantity} ks, snižte množství.`}
+        {availableQuantity === 0 ? 'Odeberte z košíku.' : 'Snižte množství v košíku.'}
     </p>
 );

@@ -37,6 +37,10 @@ const withQuantity = (cart: Cart, product: CartProduct, quantity: number): Cart 
         : cart.map((existing) => (existing.productId === product.productId ? line : existing));
 };
 
+/** Whether `quantity` units are more than the product has left; such a cart line is flagged. */
+export const exceedsAvailability = (quantity: number, product: CartProduct): boolean =>
+    quantity > product.availableQuantity;
+
 /**
  * Why the cart cannot hold `quantity` units of the product, or `null` if it can. The online
  * limits come from the same check the server applies at submission.
@@ -46,7 +50,7 @@ const findQuantityLimit = (
     product: CartProduct,
     quantity: number,
 ): QuantityLimit | null => {
-    if (quantity > product.availableQuantity) {
+    if (exceedsAvailability(quantity, product)) {
         return 'AVAILABILITY';
     }
     const violation = findOnlineQuantityLimitViolation(withQuantity(cart, product, quantity));
@@ -106,7 +110,7 @@ export const reviewCart = (
         if (product === null) {
             return { line, product, issue: 'NOT_OFFERED' };
         }
-        const issue = line.quantity > product.availableQuantity ? 'EXCEEDS_AVAILABILITY' : null;
+        const issue = exceedsAvailability(line.quantity, product) ? 'EXCEEDS_AVAILABILITY' : null;
         return { line, product, issue };
     });
     let units = 0;

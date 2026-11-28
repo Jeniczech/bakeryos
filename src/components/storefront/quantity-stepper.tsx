@@ -1,6 +1,6 @@
 'use client';
 
-import { getQuantityLimit, type CartProduct } from '@/lib/cart/cart';
+import { exceedsAvailability, getQuantityLimit, type CartProduct } from '@/lib/cart/cart';
 import { useCartEditor } from './cart-provider';
 import { useCheckout } from './checkout-provider';
 import { CART_CONTROL_ROW_CLASSES, LimitHint, OverAvailabilityHint } from './limit-hint';
@@ -57,7 +57,7 @@ export const QuantityStepper = ({
                 +
             </button>
             {showLimit &&
-                (quantity > product.availableQuantity ? (
+                (exceedsAvailability(quantity, product) ? (
                     <OverAvailabilityHint availableQuantity={product.availableQuantity} />
                 ) : (
                     limit && <LimitHint limit={limit} />
