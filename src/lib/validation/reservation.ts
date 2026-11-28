@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { isValidCalendarDate } from '@/lib/date-time/prague';
 
-export const ONLINE_MAX_UNITS_PER_PRODUCT = 20;
-export const ONLINE_MAX_UNITS_PER_RESERVATION = 50;
+export const ONLINE_MAX_UNITS_PER_PRODUCT = 10;
+export const ONLINE_MAX_UNITS_PER_RESERVATION = 20;
 export const CUSTOMER_NAME_MAX_LENGTH = 100;
 export const MAX_ITEMS_PER_REQUEST = 100;
 

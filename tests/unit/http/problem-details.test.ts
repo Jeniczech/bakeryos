@@ -26,7 +26,7 @@ describe('mapDomainError', () => {
         ['outside window', new PickupDateUnavailableError('OUTSIDE_BOOKING_WINDOW'), 422],
         ['bakery closed', new PickupDateUnavailableError('BAKERY_CLOSED'), 422],
         ['ordering cutoff', new PickupDateUnavailableError('CUTOFF_PASSED'), 409],
-        ['quantity limit', new OnlineQuantityLimitError('RESERVATION_LIMIT_EXCEEDED', 50, 51), 422],
+        ['quantity limit', new OnlineQuantityLimitError('RESERVATION_LIMIT_EXCEEDED', 20, 21), 422],
         ['product unavailable', new ProductUnavailableError([]), 422],
         ['capacity', new InsufficientCapacityError([]), 409],
         ['idempotency', new IdempotencyConflictError(), 409],

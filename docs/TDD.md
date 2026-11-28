@@ -123,7 +123,7 @@ Store money as integer **CZK haléře**. Load prices from the database at reserv
 
 ### 4.5 Order limits and customer input
 
-- **Online** reservations: at most **20 units per product** and **50 units per reservation**. Enforced in the Zod schema and again in `createReservation` for `source = 'online'`. Admin reservations are bounded only by capacity.
+- **Online** reservations: at most **10 units per product** and **20 units per reservation**. Enforced in the Zod schema and again in `createReservation` for `source = 'online'`. Admin reservations are bounded only by capacity.
 - Phone normalization: strip spaces, dashes, and parentheses; require `^\+?\d{9,15}$`; store the normalized form. Normalization happens before the canonical request hash is computed.
 - Customer name: trimmed, 1–100 characters.
 

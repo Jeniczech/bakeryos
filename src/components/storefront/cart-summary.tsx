@@ -11,6 +11,10 @@ import {
 } from '@/lib/cart/cart';
 import { formatLongDate } from '@/lib/formatting/dates';
 import { formatPrice } from '@/lib/formatting/money';
+import {
+    ONLINE_MAX_UNITS_PER_PRODUCT,
+    ONLINE_MAX_UNITS_PER_RESERVATION,
+} from '@/lib/validation/reservation';
 import { useCart, useCartEditor } from './cart-provider';
 import { useCheckout } from './checkout-provider';
 import { QuantityStepper } from './quantity-stepper';
@@ -197,6 +201,11 @@ export const CartSummary = ({
                             </span>
                         </div>
                         <p className="text-sm text-stone-500">Platíte až při vyzvednutí.</p>
+                        <p className="text-sm text-stone-500">
+                            Online si můžete rezervovat maximálně {ONLINE_MAX_UNITS_PER_PRODUCT}{' '}
+                            kusů od jednoho druhu pečiva a {ONLINE_MAX_UNITS_PER_RESERVATION} kusů
+                            celkem. Pro větší množství nám prosím zavolejte.
+                        </p>
                     </>
                 ) : (
                     <p className="text-sm text-stone-600">

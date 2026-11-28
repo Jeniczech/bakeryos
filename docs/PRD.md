@@ -52,7 +52,7 @@ Payment occurs at pickup. There are no customer accounts, emails, or SMS notific
 
 - Show product name, optional description and image, current price, and remaining reservable quantity.
 - Support multiple products and positive integer quantities per reservation.
-- Online reservations are limited to **20 units per product** and **50 units per reservation**. Larger orders are placed by phone.
+- Online reservations are limited to **10 units per product** and **20 units per reservation**. Larger orders are placed by phone.
 - Do not allow a customer to knowingly add more than the displayed available quantity.
 - Availability displayed in the catalog is informational; the server must recheck it at submission.
 - Changing the pickup date revalidates the cart and clearly identifies unavailable products or quantities. Do not silently remove or modify items.

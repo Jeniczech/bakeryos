@@ -75,35 +75,35 @@ describe('normalizeItems', () => {
 });
 
 describe('findOnlineQuantityLimitViolation', () => {
-    it('allows 20 units of one product and 50 units in total', () => {
+    it('allows 10 units of one product and 20 units in total', () => {
         expect(
-            findOnlineQuantityLimitViolation([{ productId: productA, quantity: 20 }]),
+            findOnlineQuantityLimitViolation([{ productId: productA, quantity: 10 }]),
         ).toBeNull();
         expect(
             findOnlineQuantityLimitViolation([
-                { productId: productA, quantity: 20 },
-                { productId: productB, quantity: 20 },
-                { productId: productC, quantity: 10 },
+                { productId: productA, quantity: 10 },
+                { productId: productB, quantity: 5 },
+                { productId: productC, quantity: 5 },
             ]),
         ).toBeNull();
     });
 
-    it('rejects 21 units of one product', () => {
-        expect(findOnlineQuantityLimitViolation([{ productId: productA, quantity: 21 }])).toEqual({
+    it('rejects 11 units of one product', () => {
+        expect(findOnlineQuantityLimitViolation([{ productId: productA, quantity: 11 }])).toEqual({
             reason: 'PRODUCT_LIMIT_EXCEEDED',
             productId: productA,
-            quantity: 21,
+            quantity: 11,
         });
     });
 
-    it('rejects 51 units in total', () => {
+    it('rejects 21 units in total', () => {
         expect(
             findOnlineQuantityLimitViolation([
-                { productId: productA, quantity: 20 },
-                { productId: productB, quantity: 20 },
-                { productId: productC, quantity: 11 },
+                { productId: productA, quantity: 10 },
+                { productId: productB, quantity: 10 },
+                { productId: productC, quantity: 1 },
             ]),
-        ).toEqual({ reason: 'RESERVATION_LIMIT_EXCEEDED', quantity: 51 });
+        ).toEqual({ reason: 'RESERVATION_LIMIT_EXCEEDED', quantity: 21 });
     });
 });
 
@@ -190,20 +190,20 @@ describe('onlineReservationRequestSchema', () => {
         const result = onlineReservationRequestSchema.safeParse({
             ...validRequest,
             items: [
-                { productId: productHex, quantity: 20 },
-                { productId: productHex.toUpperCase(), quantity: 20 },
+                { productId: productHex, quantity: 6 },
+                { productId: productHex.toUpperCase(), quantity: 5 },
             ],
         });
         expect(result.success).toBe(false);
     });
 
-    it('rejects more than 50 units in total', () => {
+    it('rejects more than 20 units in total', () => {
         const result = onlineReservationRequestSchema.safeParse({
             ...validRequest,
             items: [
-                { productId: productA, quantity: 20 },
-                { productId: productB, quantity: 20 },
-                { productId: productC, quantity: 11 },
+                { productId: productA, quantity: 10 },
+                { productId: productB, quantity: 10 },
+                { productId: productC, quantity: 1 },
             ],
         });
         expect(result.success).toBe(false);
