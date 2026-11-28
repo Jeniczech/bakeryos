@@ -10,6 +10,7 @@ import {
     type DailyPlan,
 } from '@/server/db/lock-daily-plans';
 import { dailyProductPlans, products } from '@/server/db/schema';
+import { uniqueProductName } from '../support/unique-name';
 
 // Far outside any booking window, so tests never collide with seeded or demo data.
 const DATE = '2099-03-10';
@@ -22,7 +23,7 @@ const insertProduct = async (defaults: {
 }) => {
     const [product] = await getDb()
         .insert(products)
-        .values({ name: 'Materialization test loaf', price: 5000, ...defaults })
+        .values({ name: uniqueProductName('Materialization test loaf'), price: 5000, ...defaults })
         .returning();
     createdProductIds.push(product.id);
     return product;

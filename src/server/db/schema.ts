@@ -12,6 +12,7 @@ import {
     text,
     timestamp,
     unique,
+    uniqueIndex,
     uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -44,6 +45,7 @@ export const products = pgTable(
         updatedAt: updatedAt(),
     },
     (table) => [
+        uniqueIndex('products_name_unique').on(sql`lower(${table.name})`),
         check('products_name_not_blank', sql`length(trim(${table.name})) > 0`),
         check('products_price_nonnegative', sql`${table.price} >= 0`),
         check('products_default_capacity_nonnegative', sql`${table.defaultCapacity} >= 0`),

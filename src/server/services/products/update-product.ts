@@ -3,14 +3,21 @@ import { z } from 'zod';
 import { productInputSchema, type ProductInput } from '@/lib/validation/product';
 import { uuidSchema } from '@/lib/validation/reservation';
 import { getDb } from '@/server/db/client';
+import { isUniqueViolation } from '@/server/db/errors';
 import { products } from '@/server/db/schema';
 import {
     InvalidRequestError,
     ProductChangedError,
+    ProductNameTakenError,
     ProductNotFoundError,
     toValidationIssues,
 } from '@/server/domain/errors';
-import { adminProductColumns, productVersion, type AdminProduct } from './admin-products';
+import {
+    adminProductColumns,
+    PRODUCT_NAME_CONSTRAINT,
+    productVersion,
+    type AdminProduct,
+} from './admin-products';
 
 const versionSchema = z.string().regex(/^\d{1,20}$/);
 
@@ -21,7 +28,8 @@ const versionSchema = z.string().regex(/^\d{1,20}$/);
  *
  * `active: false` deactivates the product, which blocks new reservations (`createReservation`
  * re-checks activity after locking) and keeps it out of the catalog. Existing reservations are
- * unaffected: their items carry name and price snapshots. Existing daily plans keep their
+ * unaffected: their items carry name and price snapshots. A name another product has, compared
+ * case-insensitively, throws `ProductNameTakenError`. Existing daily plans keep their
  * capacity; new defaults apply only to dates planned afterwards.
  */
 export const updateProduct = async (
@@ -45,7 +53,12 @@ export const updateProduct = async (
         .update(products)
         .set(parsed.data)
         .where(and(eq(products.id, id.data), sql`${productVersion} = ${version.data}`))
-        .returning(adminProductColumns);
+        .returning(adminProductColumns)
+        .catch((error: unknown) => {
+            throw isUniqueViolation(error, PRODUCT_NAME_CONSTRAINT)
+                ? new ProductNameTakenError(parsed.data.name)
+                : error;
+        });
     if (product) {
         return product;
     }

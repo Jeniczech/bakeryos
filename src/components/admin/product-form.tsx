@@ -28,8 +28,12 @@ const FIELD_MESSAGES: Record<ProductField, string> = {
         'Zadejte množství pro pultový prodej jako celé nezáporné číslo, nejvýše rovné kapacitě.',
 };
 
+const NAME_TAKEN_MESSAGE =
+    'Zvolte jiný název. Pokud jde o neaktivní produkt, upravte ho a znovu aktivujte.';
+
 const ERROR_MESSAGES: Record<Exclude<ProductFormState['error'], null>, string> = {
     INVALID_REQUEST: 'Opravte prosím zvýrazněná pole.',
+    NAME_TAKEN: 'Produkt s tímto názvem už existuje.',
     NOT_FOUND: 'Produkt nebyl nalezen.',
     CHANGED:
         'Produkt mezitím někdo upravil, změny proto nebyly uloženy. Načtěte aktuální údaje a upravte je znovu.',
@@ -87,7 +91,9 @@ const TextField = ({
             )}
             {invalid && (
                 <p id={`${id}-error`} className="text-sm text-red-800">
-                    {FIELD_MESSAGES[field]}
+                    {field === 'name' && state.error === 'NAME_TAKEN'
+                        ? NAME_TAKEN_MESSAGE
+                        : FIELD_MESSAGES[field]}
                 </p>
             )}
         </div>

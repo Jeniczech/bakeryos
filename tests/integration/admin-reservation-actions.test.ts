@@ -5,6 +5,7 @@ import { changeReservationStatus } from '@/app/admin/(dashboard)/reservations/ac
 import { getPragueDate } from '@/lib/date-time/prague';
 import { closeDb, getDb } from '@/server/db/client';
 import { dailyProductPlans, products, reservationItems, reservations } from '@/server/db/schema';
+import { uniqueProductName } from '../support/unique-name';
 
 const session = vi.hoisted(() => ({
     current: null as { user: { id: string; email: string } } | null,
@@ -21,7 +22,7 @@ const createdProductIds: string[] = [];
 const insertTodaysReservation = async () => {
     const [product] = await getDb()
         .insert(products)
-        .values({ name: 'Action test loaf', price: 3000, defaultCapacity: 10 })
+        .values({ name: uniqueProductName('Action test loaf'), price: 3000, defaultCapacity: 10 })
         .returning();
     createdProductIds.push(product.id);
     const [reservation] = await getDb()

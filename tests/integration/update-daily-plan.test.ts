@@ -21,6 +21,7 @@ import {
 } from '@/server/domain/errors';
 import type { ReservationStatus } from '@/server/domain/reservation-rules';
 import { updateDailyPlan } from '@/server/services/production/update-daily-plan';
+import { uniqueProductName } from '../support/unique-name';
 
 // Far outside any real booking window; the clock is injected relative to these dates.
 const DATE = '2099-06-10'; // Wednesday
@@ -36,7 +37,12 @@ const createdProductIds: string[] = [];
 const insertProduct = async (overrides: Partial<typeof products.$inferInsert> = {}) => {
     const [product] = await getDb()
         .insert(products)
-        .values({ name: 'Plan test loaf', price: 4500, defaultCapacity: 10, ...overrides })
+        .values({
+            name: uniqueProductName('Plan test loaf'),
+            price: 4500,
+            defaultCapacity: 10,
+            ...overrides,
+        })
         .returning();
     createdProductIds.push(product.id);
     return product;
@@ -115,7 +121,7 @@ afterAll(async () => {
 
 describe('updateDailyPlan', () => {
     it('materializes the plan on first write and returns the production overview', async () => {
-        const bread = await insertProduct({ name: 'Rye', defaultCapacity: 10 });
+        const bread = await insertProduct({ name: 'Plan rye', defaultCapacity: 10 });
         await insertReservation(bread.id, 3);
 
         const result = await updateDailyPlan(
@@ -125,7 +131,7 @@ describe('updateDailyPlan', () => {
 
         expect(result).toEqual({
             productId: bread.id,
-            productName: 'Rye',
+            productName: 'Plan rye',
             capacity: 15,
             activeReserved: 3,
             retainedCancelled: 0,

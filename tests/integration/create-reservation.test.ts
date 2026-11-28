@@ -27,6 +27,7 @@ import {
     deriveManagementToken,
     hashManagementToken,
 } from '@/server/services/reservations/management-token';
+import { uniqueProductName } from '../support/unique-name';
 
 // Far outside any real booking window; the clock is injected relative to these dates.
 const PICKUP_DATE = '2099-05-13'; // Wednesday
@@ -43,7 +44,12 @@ const insertProduct = async (
 ) => {
     const [product] = await getDb()
         .insert(products)
-        .values({ name: 'Reservation test loaf', price: 4500, defaultCapacity: 10, ...overrides })
+        .values({
+            name: uniqueProductName('Reservation test loaf'),
+            price: 4500,
+            defaultCapacity: 10,
+            ...overrides,
+        })
         .returning();
     createdProductIds.push(product.id);
     if (weekdays.length > 0) {

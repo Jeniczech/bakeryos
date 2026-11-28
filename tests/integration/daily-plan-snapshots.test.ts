@@ -15,6 +15,7 @@ import { getProduct } from '@/server/services/products/admin-products';
 import { listAvailableProducts } from '@/server/services/products/get-available-products';
 import { updateProduct } from '@/server/services/products/update-product';
 import { createReservation } from '@/server/services/reservations/create-reservation';
+import { uniqueProductName } from '../support/unique-name';
 
 // Far outside any real booking window; the clock is injected relative to these dates.
 const PLANNED_DATE = '2099-10-14'; // Wednesday
@@ -27,7 +28,12 @@ const createdProductIds: string[] = [];
 const insertProduct = async (defaultCapacity: number, defaultWalkInQuantity: number) => {
     const [product] = await getDb()
         .insert(products)
-        .values({ name: 'Snapshot test loaf', price: 4500, defaultCapacity, defaultWalkInQuantity })
+        .values({
+            name: uniqueProductName('Snapshot test loaf'),
+            price: 4500,
+            defaultCapacity,
+            defaultWalkInQuantity,
+        })
         .returning();
     createdProductIds.push(product.id);
     return product;

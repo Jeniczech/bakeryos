@@ -20,6 +20,9 @@ export type AdminProduct = {
  * `updated_at` in whole microseconds, as text: exact, unlike a JavaScript `Date`, which drops
  * the microseconds PostgreSQL stores.
  */
+/** The case-insensitive unique index on product names (`products_name_unique`). */
+export const PRODUCT_NAME_CONSTRAINT = 'products_name_unique';
+
 export const productVersion = sql<string>`(extract(epoch from ${products.updatedAt}) * 1000000)::bigint::text`;
 
 export const adminProductColumns = {

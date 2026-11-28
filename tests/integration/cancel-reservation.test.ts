@@ -19,6 +19,7 @@ import {
 } from '@/server/services/reservations/create-reservation';
 import { getReservationByToken } from '@/server/services/reservations/get-reservation';
 import { deriveManagementToken } from '@/server/services/reservations/management-token';
+import { uniqueProductName } from '../support/unique-name';
 
 // Far outside any real booking window; the clock is injected relative to this date.
 const PICKUP_DATE = '2099-09-16'; // Wednesday
@@ -36,7 +37,7 @@ const createdProductIds: string[] = [];
 const insertProduct = async (defaultCapacity = 5) => {
     const [product] = await getDb()
         .insert(products)
-        .values({ name: 'Cancellation test loaf', price: 5000, defaultCapacity })
+        .values({ name: uniqueProductName('Cancellation test loaf'), price: 5000, defaultCapacity })
         .returning();
     createdProductIds.push(product.id);
     return product;
@@ -118,7 +119,7 @@ describe('getReservationByToken', () => {
             items: [
                 {
                     productId: product.id,
-                    productName: 'Cancellation test loaf',
+                    productName: product.name,
                     unitPrice: 5000,
                     quantity: 2,
                 },

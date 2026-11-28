@@ -7,6 +7,7 @@ import { requireAdmin } from '@/server/auth/require-admin';
 import {
     InvalidRequestError,
     ProductChangedError,
+    ProductNameTakenError,
     ProductNotFoundError,
 } from '@/server/domain/errors';
 import { createProduct } from '@/server/services/products/create-product';
@@ -19,7 +20,7 @@ export type ProductField =
 export type ProductFormValues = Record<ProductField, string> & { active: boolean };
 
 export type ProductFormState = {
-    error: 'INVALID_REQUEST' | 'NOT_FOUND' | 'CHANGED' | 'UNAVAILABLE' | null;
+    error: 'INVALID_REQUEST' | 'NAME_TAKEN' | 'NOT_FOUND' | 'CHANGED' | 'UNAVAILABLE' | null;
     fields: ProductField[];
     values: ProductFormValues;
 };
@@ -71,6 +72,9 @@ const toFailure = (error: unknown, values: ProductFormValues): ProductFormState 
             error.issues.some((issue) => issue.path === field),
         );
         return { error: 'INVALID_REQUEST', fields, values };
+    }
+    if (error instanceof ProductNameTakenError) {
+        return { error: 'NAME_TAKEN', fields: ['name'], values };
     }
     if (error instanceof ProductNotFoundError) {
         return { error: 'NOT_FOUND', fields: [], values };

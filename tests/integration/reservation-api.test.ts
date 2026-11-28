@@ -17,6 +17,7 @@ import {
     reservations,
 } from '@/server/db/schema';
 import { RESERVATION_RATE_LIMIT } from '@/server/services/rate-limit';
+import { uniqueProductName } from '../support/unique-name';
 
 // `connection()` needs a Next request scope, which handlers called directly do not have.
 vi.mock('next/server', async (importOriginal) => ({
@@ -50,7 +51,7 @@ const findBookableDate = async (): Promise<string> => {
     throw new Error('Every day in the online booking window is closed.');
 };
 
-const insertProduct = async (defaultCapacity = 5, name = 'API test loaf') => {
+const insertProduct = async (defaultCapacity = 5, name = uniqueProductName('API test loaf')) => {
     const [product] = await getDb()
         .insert(products)
         .values({ name, price: 3900, defaultCapacity })
@@ -146,7 +147,7 @@ describe('GET /api/products', () => {
         expect(body.pickupDate).toBe(pickupDate);
         expect(body.products).toContainEqual({
             id: product.id,
-            name: 'API test loaf',
+            name: product.name,
             description: null,
             imageUrl: null,
             price: 3900,
@@ -187,7 +188,7 @@ describe('POST /api/reservations', () => {
             items: [
                 {
                     productId: product.id,
-                    productName: 'API test loaf',
+                    productName: product.name,
                     unitPrice: 3900,
                     quantity: 2,
                 },
@@ -203,10 +204,7 @@ describe('POST /api/reservations', () => {
 
     it('lists items in the same order on creation, replay, and the management endpoint', async () => {
         // Name order is chosen to differ from ID order whichever IDs are generated.
-        const [first, second] = [
-            await insertProduct(5, 'API test A'),
-            await insertProduct(5, 'API test B'),
-        ];
+        const [first, second] = [await insertProduct(5), await insertProduct(5)];
         const [high, low] = first.id > second.id ? [first, second] : [second, first];
         await getDb().update(products).set({ name: 'API test A' }).where(eq(products.id, high.id));
         await getDb().update(products).set({ name: 'API test B' }).where(eq(products.id, low.id));

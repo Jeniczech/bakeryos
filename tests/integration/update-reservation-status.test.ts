@@ -24,6 +24,7 @@ import { cancelReservation } from '@/server/services/reservations/cancel-reserva
 import { createReservation } from '@/server/services/reservations/create-reservation';
 import { getDailyReservations } from '@/server/services/reservations/get-daily-reservations';
 import { updateReservationStatus } from '@/server/services/reservations/update-reservation-status';
+import { uniqueProductName } from '../support/unique-name';
 
 // Far outside any real booking window; the clock is injected relative to this date.
 const PICKUP_DATE = '2099-10-14'; // Wednesday
@@ -38,7 +39,7 @@ const observerDb = drizzle(observerPool, { schema });
 
 const createdProductIds: string[] = [];
 
-const insertProduct = async (name = 'Status test loaf') => {
+const insertProduct = async (name = uniqueProductName('Status test loaf')) => {
     const [product] = await getDb()
         .insert(products)
         .values({ name, price: 4000, defaultCapacity: 10 })

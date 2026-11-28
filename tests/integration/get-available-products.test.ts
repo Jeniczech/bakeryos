@@ -18,6 +18,7 @@ import {
 } from '@/server/services/products/get-available-products';
 import { getOfferedProducts } from '@/server/services/products/get-offered-products';
 import { createReservation } from '@/server/services/reservations/create-reservation';
+import { uniqueProductName } from '../support/unique-name';
 
 // Far outside any real booking window; the clock is injected relative to this date.
 const PICKUP_DATE = '2099-10-14'; // Wednesday
@@ -35,7 +36,12 @@ const insertProduct = async (
 ) => {
     const [product] = await getDb()
         .insert(products)
-        .values({ name: 'Catalog test loaf', price: 4200, defaultCapacity: 10, ...overrides })
+        .values({
+            name: uniqueProductName('Catalog test loaf'),
+            price: 4200,
+            defaultCapacity: 10,
+            ...overrides,
+        })
         .returning();
     createdProductIds.push(product.id);
     if (weekdays.length > 0) {
@@ -90,7 +96,7 @@ afterAll(async () => {
 describe('getAvailableProducts', () => {
     it('lists products from their defaults without creating a daily plan', async () => {
         const product = await insertProduct({
-            name: 'Rye',
+            name: 'Catalog rye',
             description: 'Dark rye',
             imageUrl: '/rye.jpg',
             price: 6500,
@@ -105,7 +111,7 @@ describe('getAvailableProducts', () => {
         expect(catalog.products).toEqual([
             {
                 id: product.id,
-                name: 'Rye',
+                name: 'Catalog rye',
                 description: 'Dark rye',
                 imageUrl: '/rye.jpg',
                 price: 6500,
@@ -261,7 +267,7 @@ describe('listAvailableProducts', () => {
 describe('getOfferedProducts', () => {
     it('lists offered products without availability, regardless of the cutoff', async () => {
         const wednesday = await insertProduct(
-            { name: 'Rye', description: 'Dark rye', price: 6500 },
+            { name: 'Catalog rye', description: 'Dark rye', price: 6500 },
             [WEDNESDAY],
         );
         await insertProduct({ name: 'Monday loaf' }, [MONDAY]);
@@ -272,7 +278,7 @@ describe('getOfferedProducts', () => {
         expect(offered?.filter((product) => createdProductIds.includes(product.id))).toEqual([
             {
                 id: wednesday.id,
-                name: 'Rye',
+                name: 'Catalog rye',
                 description: 'Dark rye',
                 imageUrl: null,
                 price: 6500,
