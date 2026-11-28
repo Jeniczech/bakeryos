@@ -27,6 +27,7 @@ export type SubmitFailure = {
     kind: SubmitFailureKind;
     /** The date it was sent for: the message only applies there. */
     pickupDate: string;
+    items: ReservationPayload['items'];
     retryAfterMinutes: number;
 };
 
@@ -70,16 +71,25 @@ export const CheckoutProvider = ({ children }: { children: React.ReactNode }) =>
             setSubmitting(true);
             setFailure(null);
             const fail = (code: string | null, retryAfter: string | null = null) => {
-                inFlight.current = false;
-                setSubmitting(false);
                 const { kind, refreshCatalog } = describeSubmitFailure(code);
-                setFailure({
-                    kind,
-                    pickupDate: payload.pickupDate,
-                    retryAfterMinutes: parseRetryAfterMinutes(retryAfter),
-                });
+                const showFailure = () => {
+                    setSubmitting(false);
+                    setFailure({
+                        kind,
+                        pickupDate: payload.pickupDate,
+                        items: payload.items,
+                        retryAfterMinutes: parseRetryAfterMinutes(retryAfter),
+                    });
+                };
                 if (refreshCatalog) {
-                    router.refresh();
+                    // One transition with the refresh: the notice and the cart's flagged lines
+                    // appear together, and the cart stays locked until they do.
+                    startTransition(() => {
+                        showFailure();
+                        router.refresh();
+                    });
+                } else {
+                    showFailure();
                 }
             };
             try {

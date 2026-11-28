@@ -114,6 +114,36 @@ export const describeSubmitFailure = (
     };
 };
 
+/** What the cart beside the checkout button currently tells the customer. */
+type CartView = {
+    cart: Cart;
+    flaggedLines: number;
+    /** The selected date no longer takes reservations; the cart says so instead of a total. */
+    dateClosed: boolean;
+};
+
+/**
+ * Whether a failed submission's notice still applies, or the refreshed cart already explains it.
+ * Once the date has closed, the cart's closed-date notice replaces every date-related failure.
+ * Otherwise a capacity or availability failure is shown only while the cart flags nothing and
+ * still holds the items that were sent, since flagged lines already say what to change.
+ */
+export const isSubmitFailureShown = (
+    failure: { kind: SubmitFailureKind; items: ReservationPayload['items'] },
+    { cart, flaggedLines, dateClosed }: CartView,
+): boolean => {
+    if (failure.kind !== 'CAPACITY' && failure.kind !== 'UNAVAILABLE') {
+        return failure.kind !== 'DATE_CLOSED' || !dateClosed;
+    }
+    if (dateClosed) {
+        return false;
+    }
+    const cartItems = normalizeItems(
+        cart.map(({ productId, quantity }) => ({ productId, quantity })),
+    );
+    return flaggedLines === 0 && JSON.stringify(cartItems) === JSON.stringify(failure.items);
+};
+
 /** Whole minutes from a `Retry-After` header in seconds, at least 1. */
 export const parseRetryAfterMinutes = (header: string | null): number => {
     const seconds = Number(header);
