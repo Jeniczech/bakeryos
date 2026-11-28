@@ -14,7 +14,7 @@ import { createProduct } from '@/server/services/products/create-product';
 import { updateProduct } from '@/server/services/products/update-product';
 
 export type ProductField =
-    'name' | 'description' | 'imageUrl' | 'price' | 'defaultCapacity' | 'defaultWalkInQuantity';
+    'name' | 'description' | 'price' | 'defaultCapacity' | 'defaultWalkInQuantity';
 
 /** The form as submitted, so a rejected form shows what was entered. */
 export type ProductFormValues = Record<ProductField, string> & { active: boolean };
@@ -28,7 +28,6 @@ export type ProductFormState = {
 const PRODUCT_FIELDS: readonly ProductField[] = [
     'name',
     'description',
-    'imageUrl',
     'price',
     'defaultCapacity',
     'defaultWalkInQuantity',
@@ -44,7 +43,6 @@ const readValues = (formData: FormData): ProductFormValues => {
     return {
         name: text('name'),
         description: text('description'),
-        imageUrl: text('imageUrl'),
         price: text('price'),
         defaultCapacity: text('defaultCapacity'),
         defaultWalkInQuantity: text('defaultWalkInQuantity'),
@@ -59,7 +57,6 @@ const parseWholeNumber = (value: string): number =>
 const toProductInput = (values: ProductFormValues): ProductInput => ({
     name: values.name,
     description: values.description,
-    imageUrl: values.imageUrl,
     price: parseCrownsToHalere(values.price) ?? Number.NaN,
     defaultCapacity: parseWholeNumber(values.defaultCapacity),
     defaultWalkInQuantity: parseWholeNumber(values.defaultWalkInQuantity),

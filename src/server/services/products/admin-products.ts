@@ -7,7 +7,6 @@ export type AdminProduct = {
     id: string;
     name: string;
     description: string | null;
-    imageUrl: string | null;
     price: number; // haléře
     active: boolean;
     defaultCapacity: number;
@@ -29,7 +28,6 @@ export const adminProductColumns = {
     id: products.id,
     name: products.name,
     description: products.description,
-    imageUrl: products.imageUrl,
     price: products.price,
     active: products.active,
     defaultCapacity: products.defaultCapacity,

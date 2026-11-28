@@ -9,7 +9,6 @@ export type CatalogProduct = {
     id: string;
     name: string;
     description: string | null;
-    imageUrl: string | null;
     price: number; // haléře
 };
 
@@ -28,7 +27,6 @@ export const listOfferedProducts = async (
             id: products.id,
             name: products.name,
             description: products.description,
-            imageUrl: products.imageUrl,
             price: products.price,
             defaultCapacity: products.defaultCapacity,
             defaultWalkInQuantity: products.defaultWalkInQuantity,
@@ -76,11 +74,10 @@ export const getOfferedProducts = async (pickupDate: string): Promise<CatalogPro
     if (!isOpen) {
         return null;
     }
-    return rows.map(({ id, name, description, imageUrl, price }) => ({
+    return rows.map(({ id, name, description, price }) => ({
         id,
         name,
         description,
-        imageUrl,
         price,
     }));
 };

@@ -36,7 +36,6 @@ export const products = pgTable(
         id: uuid('id').primaryKey().defaultRandom(),
         name: text('name').notNull(),
         description: text('description'),
-        imageUrl: text('image_url'),
         price: integer('price').notNull(),
         active: boolean('active').notNull().default(true),
         defaultCapacity: integer('default_capacity').notNull(),

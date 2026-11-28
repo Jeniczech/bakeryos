@@ -12,16 +12,11 @@ import {
 } from '@/app/admin/(dashboard)/products/actions';
 import { PRIMARY_BUTTON_CLASSES, SECONDARY_BUTTON_CLASSES } from '@/components/ui/button-classes';
 import { Notice } from '@/components/ui/notice';
-import {
-    PRODUCT_DESCRIPTION_MAX_LENGTH,
-    PRODUCT_IMAGE_URL_MAX_LENGTH,
-    PRODUCT_NAME_MAX_LENGTH,
-} from '@/lib/validation/product';
+import { PRODUCT_DESCRIPTION_MAX_LENGTH, PRODUCT_NAME_MAX_LENGTH } from '@/lib/validation/product';
 
 const FIELD_MESSAGES: Record<ProductField, string> = {
     name: `Zadejte název (nejvýše ${PRODUCT_NAME_MAX_LENGTH} znaků).`,
     description: `Popis může mít nejvýše ${PRODUCT_DESCRIPTION_MAX_LENGTH} znaků.`,
-    imageUrl: 'Zadejte adresu obrázku začínající http:// nebo https://, nebo pole nechte prázdné.',
     price: 'Zadejte cenu v Kč, nejvýše se dvěma desetinnými místy (např. 45 nebo 45,50).',
     defaultCapacity: 'Zadejte kapacitu jako celé nezáporné číslo.',
     defaultWalkInQuantity:
@@ -46,7 +41,6 @@ const INPUT_CLASSES =
 const EMPTY_VALUES: ProductFormValues = {
     name: '',
     description: '',
-    imageUrl: '',
     price: '',
     defaultCapacity: '',
     defaultWalkInQuantity: '0',
@@ -185,15 +179,6 @@ const ProductFormFields = ({ product }: { product?: EditedProduct }) => {
                         </p>
                     )}
                 </div>
-                <TextField
-                    field="imageUrl"
-                    label="Adresa obrázku (nepovinná)"
-                    state={state}
-                    idPrefix={idPrefix}
-                    type="url"
-                    maxLength={PRODUCT_IMAGE_URL_MAX_LENGTH}
-                    placeholder="https://…"
-                />
                 <div className="grid gap-4 sm:grid-cols-3">
                     <TextField
                         field="price"

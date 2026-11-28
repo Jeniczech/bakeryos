@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 export const PRODUCT_NAME_MAX_LENGTH = 100;
 export const PRODUCT_DESCRIPTION_MAX_LENGTH = 1000;
-export const PRODUCT_IMAGE_URL_MAX_LENGTH = 2000;
 
 /** PostgreSQL `integer` upper bound; larger values would fail in the database instead of here. */
 const MAX_INTEGER = 2_147_483_647;
@@ -18,19 +17,9 @@ const optionalText = (max: number) =>
         .nullish()
         .transform((value) => (value ? value : null));
 
-/** Only web URLs: the storefront renders the image for customers. */
-const imageUrlSchema = z
-    .string()
-    .trim()
-    .max(PRODUCT_IMAGE_URL_MAX_LENGTH)
-    .nullish()
-    .transform((value) => (value ? value : null))
-    .pipe(z.url({ protocol: /^https?$/ }).nullable());
-
 const productFieldsSchema = z.object({
     name: z.string().trim().min(1).max(PRODUCT_NAME_MAX_LENGTH),
     description: optionalText(PRODUCT_DESCRIPTION_MAX_LENGTH),
-    imageUrl: imageUrlSchema,
     price: quantitySchema, // haléře
     defaultCapacity: quantitySchema,
     defaultWalkInQuantity: quantitySchema,

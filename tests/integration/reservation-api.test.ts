@@ -149,7 +149,6 @@ describe('GET /api/products', () => {
             id: product.id,
             name: product.name,
             description: null,
-            imageUrl: null,
             price: 3900,
             remainingQuantity: 7,
         });

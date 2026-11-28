@@ -60,7 +60,6 @@ export const listAvailableProducts = async (
             id: row.id,
             name: row.name,
             description: row.description,
-            imageUrl: row.imageUrl,
             price: row.price,
             remainingQuantity: Math.max(0, remaining),
         };

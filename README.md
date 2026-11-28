@@ -170,7 +170,7 @@ Keep migrations backward compatible so the currently deployed version keeps work
 - Admin screens for opening days, closures and product weekdays (new products are offered on every open day).
 - A print-friendly production sheet.
 - Search and filters in the reservation list, and reporting.
-- Product image upload (products support an optional image URL only).
+- Product images (removed from the MVP; products have a name and an optional description only).
 - Rotation of the management-token secret: changing `MANAGEMENT_TOKEN_SECRET` today invalidates every existing management link.
 - No email or SMS confirmation. The management link is shown only on the confirmation page, so a customer who loses it has to call the bakery.
 - No E2E test for the admin: the Playwright test covers the customer flow, and integration tests cover the admin workflows.
