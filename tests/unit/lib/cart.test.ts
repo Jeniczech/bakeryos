@@ -4,6 +4,7 @@ import {
     cartReducer,
     cartStateReducer,
     countFlaggedLines,
+    exceedsAvailability,
     getQuantityLimit,
     isCartFromOtherDate,
     reviewCart,
@@ -91,6 +92,14 @@ describe('cartReducer', () => {
 describe('cartReducer clear', () => {
     it('empties the cart', () => {
         expect(cartReducer(setQuantity([], bread, 2), { type: 'clear' })).toEqual([]);
+    });
+});
+
+describe('exceedsAvailability', () => {
+    it('is true only above the remaining quantity', () => {
+        expect(exceedsAvailability(10, bread)).toBe(false);
+        expect(exceedsAvailability(11, bread)).toBe(true);
+        expect(exceedsAvailability(1, { ...bread, availableQuantity: 0 })).toBe(true);
     });
 });
 

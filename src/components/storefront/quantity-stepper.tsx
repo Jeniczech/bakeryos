@@ -1,9 +1,9 @@
 'use client';
 
-import { getQuantityLimit, type CartProduct } from '@/lib/cart/cart';
+import { exceedsAvailability, getQuantityLimit, type CartProduct } from '@/lib/cart/cart';
 import { useCartEditor } from './cart-provider';
 import { useCheckout } from './checkout-provider';
-import { CART_CONTROL_ROW_CLASSES, LimitHint } from './limit-hint';
+import { CART_CONTROL_ROW_CLASSES, LimitHint, OverAvailabilityHint } from './limit-hint';
 
 const BUTTON_CLASSES =
     'flex size-10 shrink-0 items-center justify-center rounded-lg border border-amber-300 bg-white text-lg font-semibold text-amber-900 transition-colors hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:border-stone-200 disabled:text-stone-300 disabled:hover:bg-white';
@@ -56,7 +56,12 @@ export const QuantityStepper = ({
             >
                 +
             </button>
-            {showLimit && limit && <LimitHint limit={limit} />}
+            {showLimit &&
+                (exceedsAvailability(quantity, product) ? (
+                    <OverAvailabilityHint availableQuantity={product.availableQuantity} />
+                ) : (
+                    limit && <LimitHint limit={limit} />
+                ))}
         </div>
     );
 };
